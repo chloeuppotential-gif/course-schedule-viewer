@@ -458,23 +458,49 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const processedCourses = new Set(); 
         tasksToRender.forEach(task => {
-            const courseKey = `${task.teacher}-${task.topic}-${task.courseStart}-${task.courseEnd}`;
+            const courseKey = `${task.teacher}-${task.topic}-${task.session}-${task.courseStart}-${task.courseEnd}`;
             if (processedCourses.has(courseKey)) return;
             processedCourses.add(courseKey);
-            const courseStartDate = new Date(task.courseStart + 'T00:00:00'); const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
+            
+            const courseStartDate = new Date(task.courseStart + 'T00:00:00'); 
+            const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
+            
             if (task.courseStart === task.courseEnd) {
                 if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
                     const dayCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                    if (dayCell) { const marker = document.createElement('div'); marker.className = 'calendar-marker marker-single-day'; marker.textContent = `${task.teacher} - ${task.topic} (开/结课)`; addInteractionListeners(task, marker, true); dayCell.appendChild(marker); }
+                    if (dayCell) { 
+                        const marker = document.createElement('div'); 
+                        marker.className = 'calendar-marker marker-single-day'; 
+                        // 添加课时信息到显示文本
+                        marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`;
+                        addInteractionListeners(task, marker, true); 
+                        dayCell.appendChild(marker);
+                    }
                 }
             } else {
+                // 开课日
                 if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
                     const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                    if (startCell) { const marker = document.createElement('div'); marker.className = 'calendar-marker marker-start'; marker.textContent = `${task.teacher} - ${task.topic} (开课)`; addInteractionListeners(task, marker, true); startCell.appendChild(marker); }
+                    if (startCell) { 
+                        const marker = document.createElement('div'); 
+                        marker.className = 'calendar-marker marker-start'; 
+                        // 添加课时信息到开课标记
+                        marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`;
+                        addInteractionListeners(task, marker, true); 
+                        startCell.appendChild(marker);
+                    }
                 }
+                // 结课日
                 if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
                     const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
-                    if (endCell) { const marker = document.createElement('div'); marker.className = 'calendar-marker marker-end'; marker.textContent = `${task.teacher} - ${task.topic} (结课)`; addInteractionListeners(task, marker, true); endCell.appendChild(marker); }
+                    if (endCell) { 
+                        const marker = document.createElement('div'); 
+                        marker.className = 'calendar-marker marker-end'; 
+                        // 添加课时信息到结课标记
+                        marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`;
+                        addInteractionListeners(task, marker, true); 
+                        endCell.appendChild(marker);
+                    }
                 }
             }
         });
