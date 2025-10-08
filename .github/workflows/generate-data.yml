@@ -15,10 +15,9 @@ permissions:
 
 jobs:
   build-and-deploy:
-    # 根据错误提示，我们在这里添加部署环境的声明
+    # 这是正确的环境声明，只保留必须的 name
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -56,3 +55,5 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        # 我们把 url 的获取放在它应该在的地方，而不是 job 的开头
+        # 并且，这个 action 会自动输出 URL，我们甚至不需要在这里显式处理
