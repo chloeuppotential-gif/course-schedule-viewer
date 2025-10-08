@@ -1,1 +1,14 @@
-
+{
+  "name": "schedule-generator",
+  "version": "1.0.0",
+  "description": "A script to process an Excel schedule and generate a JSON file.",
+  "main": "process-excel.js",
+  "scripts": {
+    "start": "node process-excel.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
