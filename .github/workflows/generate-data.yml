@@ -35,13 +35,19 @@ jobs:
         run: node process-excel.js
         working-directory: ./schedule-generator
       
+      - name: Prepare deployment artifact
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp schedule-generator/data.json _site/
+      
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: './_site'
           
       - name: Deploy to GitHub Pages
         id: deployment
