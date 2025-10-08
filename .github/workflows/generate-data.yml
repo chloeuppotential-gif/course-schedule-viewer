@@ -15,6 +15,10 @@ permissions:
 
 jobs:
   build-and-deploy:
+    # 根据错误提示，我们在这里添加部署环境的声明
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -28,7 +32,6 @@ jobs:
           cache-dependency-path: schedule-generator/package.json
 
       - name: Install dependencies
-        # 这里是关键的修改！我们换回了更灵活的 npm install
         run: npm install
         working-directory: ./schedule-generator
 
