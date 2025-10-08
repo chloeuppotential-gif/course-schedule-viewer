@@ -20,18 +20,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js with Caching
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: schedule-generator/package.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         working-directory: ./schedule-generator
 
       - name: Generate data.json from Excel
         run: node process-excel.js
         working-directory: ./schedule-generator
-
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+          
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
