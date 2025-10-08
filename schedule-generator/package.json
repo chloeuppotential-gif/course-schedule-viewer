@@ -1,11 +1,12 @@
 {
   "name": "schedule-generator",
   "version": "1.0.0",
-  "description": "A script to process an Excel schedule and generate a JSON file.",
+  "description": "Generates JSON from Excel for course schedule",
   "main": "process-excel.js",
   "scripts": {
     "start": "node process-excel.js"
   },
+  "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
