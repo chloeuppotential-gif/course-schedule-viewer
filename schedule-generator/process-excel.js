@@ -16,7 +16,7 @@ try {
     }
 
     // 读取Excel文件
-    const workbook = xlsx.readFile(excelFilePath);
+    const workbook = xlsx.readFile('../schedule.xlsx');
     console.log("成功读取 schedule.xlsx 文件。");
 
     // 获取第一个工作表的名称
