@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>课程表</title>
-    <!-- 删除了 SheetJS 的引用，因为我们不再需要在浏览器中解析 Excel -->
     <style>
         :root {
             --primary-color: #3498db; --secondary-color: #2ecc71; --danger-color: #e74c3c;
@@ -113,8 +112,41 @@
         }
         .gantt-bar-course.is-hovered .gantt-bar-course-text { opacity: 1; }
         
-        .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--danger-color); z-index: 5; display: none; }
+        .gantt-today-line { 
+            position: absolute; 
+            top: 0; 
+            bottom: 0; 
+            width: 2px; 
+            background-color: var(--danger-color); 
+            z-index: 5; 
+            display: none; 
+        }
         
+        /* 增强今日线样式 */
+        .gantt-today-line::after {
+            content: '今天';
+            position: absolute;
+            top: 5px;
+            left: -15px;
+            background-color: var(--danger-color);
+            color: white;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            white-space: nowrap;
+        }
+        
+        /* 为进度条添加样式 */
+        .gantt-progress-overlay {
+            position: absolute;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-right: 2px dashed rgba(0, 0, 0, 0.3);
+            z-index: 3;
+        }
+
         /* --- 日历视图样式 --- */
         #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
         .calendar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; position: relative; }
@@ -140,6 +172,15 @@
         .tooltip-row { display: flex; justify-content: space-between; padding: 2px 0; }
         .tooltip-label { font-weight: bold; margin-right: 15px; }
         .tooltip-value { color: #ddd; }
+        
+        /* 添加页脚样式 */
+        .footer {
+            text-align: center;
+            padding: 10px;
+            font-size: 0.8em;
+            color: #888;
+            border-top: 1px solid var(--medium-gray);
+        }
     </style>
 </head>
 <body>
@@ -152,7 +193,6 @@
             <button id="calendar-view-btn">日历</button>
         </div>
         <div class="spacer"></div>
-        <!-- 隐藏了不再需要的上传按钮和文件名显示 -->
         <p id="error-message">正在加载数据...</p>
     </div>
     <div class="filters-container">
@@ -175,6 +215,9 @@
             <!-- 日历视图将由JS动态生成 -->
         </div>
     </div>
+    <div class="footer">
+        数据最后更新: <span id="last-updated-time"></span> | 当前时间: <span id="current-time"></span>
+    </div>
 </div>
 <div class="tooltip" id="tooltip"></div>
 
@@ -189,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const collapsedGroups = new Set();
 
     let currentView = 'gantt';
-    let currentDisplayDate = new Date();
+    let currentDisplayDate = new Date(); // 默认显示今天
 
     const errorMessage = document.getElementById('error-message');
     
@@ -208,8 +251,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const ganttViewBtn = document.getElementById('gantt-view-btn');
     const calendarViewBtn = document.getElementById('calendar-view-btn');
+    
+    const lastUpdatedTimeElement = document.getElementById('last-updated-time');
+    const currentTimeElement = document.getElementById('current-time');
+    
+    // 更新当前时间显示
+    function updateCurrentTime() {
+        const now = new Date();
+        currentTimeElement.textContent = now.toLocaleString('zh-CN');
+        setTimeout(updateCurrentTime, 1000); // 每秒更新一次
+    }
+    updateCurrentTime();
 
-    // 删除了所有与手动上传文件相关的事件监听
     filterTeacher.addEventListener('change', applyFilters);
     filterTopic.addEventListener('change', applyFilters);
     filterDateStart.addEventListener('change', applyFilters);
@@ -219,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
         filterTopic.value = '所有主题';
         filterDateStart.value = '';
         filterDateEnd.value = '';
-        currentDisplayDate = new Date();
+        currentDisplayDate = new Date(); // 重置为当前日期
         applyFilters();
     });
 
@@ -235,40 +288,35 @@ document.addEventListener('DOMContentLoaded', function() {
         applyFilters();
     }
     
-    // **核心改动**：创建新函数，用于自动加载 data.json
     function loadDataAndInitialize() {
-        // fetch 会请求与 index.html 在同一目录下的 data.json 文件
         fetch('data.json')
             .then(response => {
                 if (!response.ok) {
-                    // 如果文件不存在或加载失败，抛出错误
                     throw new Error(`无法加载 data.json (状态: ${response.status})。请确认后台 Excel 已上传且自动化流程成功运行。`);
                 }
-                return response.json(); // 解析 JSON 数据
+                return response.json();
             })
             .then(data => {
-                // 成功获取数据
-                allTasks = data; // 直接赋值，因为数据格式已经是我们需要的了
-                errorMessage.textContent = ''; // 清空错误信息
+                allTasks = data;
+                errorMessage.textContent = '';
 
                 if (allTasks.length === 0) {
                     throw new Error("加载的数据为空。请检查后台 schedule.xlsx 文件内容是否正确。");
                 }
                 
-                // 数据加载成功后，初始化视图
+                // 设置最后更新时间
+                lastUpdatedTimeElement.textContent = new Date().toLocaleDateString('zh-CN');
+                
                 collapsedGroups.clear();
-                currentDisplayDate = new Date(allTasks[0].sessionStart + 'T00:00:00');
+                currentDisplayDate = new Date(); // 使用当前日期
                 resetFiltersButton.click(); // 触发第一次渲染
             })
             .catch(err => {
-                // 捕获并显示任何发生的错误
                 errorMessage.textContent = '加载数据失败: ' + err.message;
                 console.error(err);
-                renderEmpty(); // 显示空状态
+                renderEmpty();
             });
     }
-
-    // 删除了 processExcelData 函数，因为数据已经由后台处理好了
 
     function populateFilterDropdown(selectElement, options, currentlySelected) {
         const finalSelection = options.includes(currentlySelected) ? currentlySelected : options[0];
@@ -341,9 +389,62 @@ document.addEventListener('DOMContentLoaded', function() {
         const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
         const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
         let title, start, end, duration;
-        if (isCourseBar) { title = "课程总览"; start = task.courseStart; end = task.courseEnd; duration = diffDays(parseDate(start), parseDate(end)); } 
-        else { title = `课时: ${task.session}`; start = task.sessionStart; end = task.sessionEnd; duration = diffDays(parseDate(start), parseDate(end)); }
-        tooltip.innerHTML = `<div class="tooltip-row"><span class="tooltip-label">${title}</span></div><hr style="border-color: #555; border-style: solid; margin: 5px 0;"><div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${task.topic}</span></div><div class="tooltip-row"><span class="tooltip-label">负责人:</span> <span class="tooltip-value">${task.teacher}</span></div><div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div><div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div><div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration} 天</span></div>`;
+        
+        // 添加进度计算
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        let progress = 0;
+        
+        if (isCourseBar) { 
+            title = "课程总览"; 
+            start = task.courseStart; 
+            end = task.courseEnd; 
+            duration = diffDays(parseDate(start), parseDate(end)); 
+            
+            // 课程总体进度
+            const courseStartDate = parseDate(start);
+            const courseEndDate = parseDate(end);
+            const todayDate = parseDate(todayStr);
+            
+            if (todayDate < courseStartDate) {
+                progress = 0;
+            } else if (todayDate > courseEndDate) {
+                progress = 100;
+            } else {
+                progress = Math.round(((todayDate - courseStartDate) / (courseEndDate - courseStartDate)) * 100);
+            }
+        } 
+        else { 
+            title = `课时: ${task.session}`; 
+            start = task.sessionStart; 
+            end = task.sessionEnd; 
+            duration = diffDays(parseDate(start), parseDate(end)); 
+            
+            // 课时进度
+            const sessionStartDate = parseDate(start);
+            const sessionEndDate = parseDate(end);
+            const todayDate = parseDate(todayStr);
+            
+            if (todayDate < sessionStartDate) {
+                progress = 0;
+            } else if (todayDate > sessionEndDate) {
+                progress = 100;
+            } else {
+                progress = Math.round(((todayDate - sessionStartDate) / (sessionEndDate - sessionStartDate)) * 100);
+            }
+        }
+        
+        tooltip.innerHTML = `
+            <div class="tooltip-row"><span class="tooltip-label">${title}</span></div>
+            <hr style="border-color: #555; border-style: solid; margin: 5px 0;">
+            <div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${task.topic}</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">负责人:</span> <span class="tooltip-value">${task.teacher}</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration} 天</span></div>
+            <div class="tooltip-row"><span class="tooltip-label">进度:</span> <span class="tooltip-value">${progress}%</span></div>
+        `;
+        
         updateTooltipPosition(event);
         tooltip.classList.add('visible');
     }
@@ -468,19 +569,63 @@ document.addEventListener('DOMContentLoaded', function() {
                     courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
                     courseBar.dataset.rowIndex = rowIndex; courseBar.dataset.groupName = teacher; ganttRows.appendChild(courseBar); addInteractionListeners(task, courseBar, true);
                     
+                    // 添加课程总进度显示
+                    const today = new Date();
+                    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+                    const courseStartDate = parseDate(task.courseStart);
+                    const courseEndDate = parseDate(task.courseEnd);
+                    
+                    if (todayUTC >= courseStartDate && todayUTC <= courseEndDate) {
+                        const progress = (todayUTC - courseStartDate) / (courseEndDate - courseStartDate);
+                        const progressWidth = courseDuration * dayWidth * progress;
+                        
+                        const progressOverlay = document.createElement('div');
+                        progressOverlay.className = 'gantt-progress-overlay';
+                        progressOverlay.style.top = `${rowIndex * 50}px`;
+                        progressOverlay.style.left = `${courseStartOffset * dayWidth}px`;
+                        progressOverlay.style.width = `${progressWidth}px`;
+                        progressOverlay.style.height = '30px';
+                        progressOverlay.dataset.rowIndex = rowIndex;
+                        progressOverlay.dataset.groupName = teacher;
+                        ganttRows.appendChild(progressOverlay);
+                    }
+                    
                     if (task.sessionStart && task.sessionEnd) {
                         const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
                         const sessionBar = document.createElement('div'); sessionBar.className = `gantt-bar gantt-bar-session ${isCollapsed ? 'collapsed' : ''}`; sessionBar.style.top = `${rowIndex * 50}px`; sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; sessionBar.style.width = `${sessionDuration * dayWidth}px`; sessionBar.style.backgroundColor = topicColors[task.topic];
                         sessionBar.textContent = task.session;
                         sessionBar.dataset.rowIndex = rowIndex; sessionBar.dataset.groupName = teacher; ganttRows.appendChild(sessionBar); addInteractionListeners(task, sessionBar, false);
+                        
+                        // 添加课时进度显示
+                        const sessionStartDate = parseDate(task.sessionStart);
+                        const sessionEndDate = parseDate(task.sessionEnd);
+                        
+                        if (todayUTC >= sessionStartDate && todayUTC <= sessionEndDate) {
+                            const progress = (todayUTC - sessionStartDate) / (sessionEndDate - sessionStartDate);
+                            const progressWidth = sessionDuration * dayWidth * progress;
+                            
+                            const progressOverlay = document.createElement('div');
+                            progressOverlay.className = 'gantt-progress-overlay';
+                            progressOverlay.style.top = `${rowIndex * 50}px`;
+                            progressOverlay.style.left = `${sessionStartOffset * dayWidth}px`;
+                            progressOverlay.style.width = `${progressWidth}px`;
+                            progressOverlay.style.height = '22px';
+                            progressOverlay.dataset.rowIndex = rowIndex;
+                            progressOverlay.dataset.groupName = teacher;
+                            ganttRows.appendChild(progressOverlay);
+                        }
                     }
                     rowIndex++;
                 });
             });
         }
-        const today = new Date(); const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+        
+        // 改进今日线显示
+        const today = new Date(); 
+        const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
         if (todayUTC >= minDate && todayUTC <= maxDate) { 
-            const todayLine = document.createElement('div'); todayLine.className = 'gantt-today-line';
+            const todayLine = document.createElement('div'); 
+            todayLine.className = 'gantt-today-line';
             const todayOffset = diffDays(minDate, todayUTC); 
             todayLine.style.left = `${(todayOffset * dayWidth) + (dayWidth / 2)}px`;
             todayLine.style.display = 'block';
