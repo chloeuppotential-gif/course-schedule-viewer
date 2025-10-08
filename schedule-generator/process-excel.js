@@ -1,56 +1,32 @@
-name: Generate and Deploy Schedule Data
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'schedule.xlsx'
-  workflow_dispatch:
+console.log('开始执行【最终版】Excel处理脚本...');
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+try {
+    // 明确指定输入和输出文件的路径
+    const excelInputPath = '../schedule.xlsx';
+    const jsonOutputPath = './data.json';
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    console.log(`正在尝试读取文件: ${excelInputPath}`);
+    const workbook = xlsx.readFile(excelInputPath);
 
-      - name: Setup Node.js with Caching
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: schedule-generator/package.json
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+        throw new Error('Excel文件中没有任何工作表(Sheet)。');
+    }
+    console.log(`成功读取工作表: ${sheetName}`);
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./schedule-generator
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = xlsx.utils.sheet_to_json(worksheet);
 
-      - name: Generate data.json from Excel
-        run: node process-excel.js
-        working-directory: ./schedule-generator
-      
-      # --- 以下是我们的最终修复 ---
-      - name: Prepare deployment artifact
-        run: |
-          mkdir -p _site
-          cp index.html _site/
-          cp schedule-generator/data.json _site/
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-        
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # 只上传我们准备好的文件夹
-          path: './_site'
-          
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    console.log(`成功将Excel转换为JSON，共 ${jsonData.length} 行数据。`);
+
+    fs.writeFileSync(jsonOutputPath, JSON.stringify(jsonData, null, 2));
+    console.log(`成功将数据写入到文件: ${jsonOutputPath}`);
+
+} catch (error) {
+    console.error('脚本执行过程中发生严重错误:', error.message);
+    process.exit(1); // 以失败状态退出
+}
