@@ -83,13 +83,71 @@
         .gantt-month { height: 40px; font-size: 0.8em; }
         .gantt-day { height: 40px; width: 40px; font-size: 0.75em; }
         .gantt-rows { position: relative; }
-        .gantt-row { height: 50px; box-sizing: border-box; border-bottom: 1px solid #f0f0f0; overflow: hidden; }
+        
+        /* 修改的行样式，处理折叠状态 */
+        .gantt-row { 
+            height: 50px; 
+            box-sizing: border-box; 
+            border-bottom: 1px solid #f0f0f0; 
+            overflow: hidden;
+            position: relative;
+            background: var(--bg-color);
+            transition: height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+        }
         .gantt-row.group-header-row { background-color: var(--header-bg); border-bottom: 1px solid var(--medium-gray); }
-        .gantt-task-item.collapsed, .gantt-row.collapsed { height: 0; padding-top: 0; padding-bottom: 0; border: none; }
-        .gantt-bar.collapsed { display: none; }
-        .gantt-grid-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-        .gantt-grid-line { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--medium-gray); }
-        .gantt-bar { box-sizing: border-box; position: absolute; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 10px; color: white; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s 0.2s; }
+        
+        /* 修改折叠样式，保持网格线可见性 */
+        .gantt-row.collapsed { 
+            height: 0px; 
+            padding: 0; 
+            border: none; 
+            opacity: 0;
+            pointer-events: none;
+        }
+        .gantt-task-item.collapsed {
+            height: 0px;
+            padding: 0;
+            border: none;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 修改网格线样式，确保始终可见 */
+        .gantt-grid-lines { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 0; 
+            pointer-events: none; 
+        }
+        .gantt-grid-line { 
+            position: absolute; 
+            top: 0; 
+            bottom: 0; 
+            border-left: 1px dashed var(--medium-gray); 
+            z-index: 1;
+        }
+        
+        .gantt-bar.collapsed { opacity: 0; pointer-events: none; }
+        
+        .gantt-bar { 
+            box-sizing: border-box; 
+            position: absolute; 
+            border-radius: 4px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 0 10px; 
+            color: white; 
+            font-size: 0.8em; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            cursor: pointer; 
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s 0.2s; 
+        }
         .gantt-task-item.highlight, .gantt-row.highlight, .gantt-task-group-header.highlight { background-color: var(--highlight-bg) !important; }
         
         .gantt-chart.is-hovering .gantt-bar:not(.is-hovered) { opacity: var(--dim-opacity) !important; }
@@ -161,6 +219,22 @@
         .tooltip-row { display: flex; justify-content: space-between; padding: 2px 0; }
         .tooltip-label { font-weight: bold; margin-right: 15px; }
         .tooltip-value { color: #ddd; }
+        
+        /* 添加过渡动画 */
+        .fade-out {
+            opacity: 0;
+            transition: opacity 0.2s ease-out;
+        }
+        
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 0.3s ease-in forwards;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
         
         /* 添加页脚样式 */
         .footer {
@@ -268,13 +342,29 @@ document.addEventListener('DOMContentLoaded', function() {
     ganttViewBtn.addEventListener('click', () => switchView('gantt'));
     calendarViewBtn.addEventListener('click', () => switchView('calendar'));
 
+    // 改进的视图切换函数，添加过渡效果
     function switchView(view) {
-        currentView = view;
-        ganttViewBtn.classList.toggle('active', view === 'gantt');
-        calendarViewBtn.classList.toggle('active', view === 'calendar');
-        ganttView.classList.toggle('active', view === 'gantt');
-        calendarView.classList.toggle('active', view === 'calendar');
-        applyFilters();
+        if (currentView === view) return; // 如果已经是当前视图，不做任何操作
+        
+        const currentViewEl = document.querySelector('.view.active');
+        const newViewEl = document.getElementById(`${view}-view`);
+        
+        // 添加过渡动画
+        currentViewEl.classList.add('fade-out');
+        
+        setTimeout(() => {
+            // 切换视图
+            currentView = view;
+            ganttViewBtn.classList.toggle('active', view === 'gantt');
+            calendarViewBtn.classList.toggle('active', view === 'calendar');
+            currentViewEl.classList.remove('active', 'fade-out');
+            newViewEl.classList.add('active', 'fade-in');
+            
+            setTimeout(() => {
+                newViewEl.classList.remove('fade-in');
+                applyFilters();
+            }, 300);
+        }, 200);
     }
     
     function loadDataAndInitialize() {
@@ -409,10 +499,58 @@ document.addEventListener('DOMContentLoaded', function() {
     function hideTooltip() { tooltip.classList.remove('visible'); }
     function updateTooltipPosition(event) { tooltip.style.left = `${event.clientX}px`; tooltip.style.top = `${event.clientY - 15}px`; }
 
+    // 改进的折叠/展开函数，修复网格线问题
     function toggleGroup(groupName) {
-        if (collapsedGroups.has(groupName)) { collapsedGroups.delete(groupName); } 
-        else { collapsedGroups.add(groupName); }
-        document.querySelectorAll(`[data-group-name='${groupName}']`).forEach(el => { el.classList.toggle('collapsed'); });
+        if (collapsedGroups.has(groupName)) {
+            collapsedGroups.delete(groupName);
+        } else {
+            collapsedGroups.add(groupName);
+        }
+        
+        // 处理折叠/展开状态
+        document.querySelectorAll(`[data-group-name='${groupName}']`).forEach(el => {
+            el.classList.toggle('collapsed');
+        });
+        
+        // 刷新网格线
+        setTimeout(refreshGridLines, 300); // 等待过渡动画完成
+    }
+
+    // 新增：刷新网格线函数
+    function refreshGridLines() {
+        if (currentView !== 'gantt') return;
+        
+        const ganttRows = document.querySelector('.gantt-rows');
+        if (!ganttRows) return;
+        
+        const gridLines = ganttRows.querySelector('.gantt-grid-lines');
+        if (!gridLines) return;
+        
+        // 计算可见行的总高度
+        const visibleRows = Array.from(document.querySelectorAll('.gantt-row:not(.collapsed)'));
+        
+        // 确保有可见行
+        if (visibleRows.length === 0) return;
+        
+        // 更新网格容器高度，确保覆盖所有可见行
+        const totalVisibleHeight = visibleRows.reduce((sum, row) => {
+            return sum + row.offsetHeight;
+        }, 0);
+        
+        // 设置网格线容器高度
+        gridLines.style.height = `${totalVisibleHeight}px`;
+        
+        // 确保网格线正确对齐和显示
+        const gridLineElements = gridLines.querySelectorAll('.gantt-grid-line');
+        gridLineElements.forEach(line => {
+            line.style.height = `${totalVisibleHeight}px`;
+        });
+        
+        // 确保今日线也正确显示
+        const todayLine = ganttRows.querySelector('.gantt-today-line');
+        if (todayLine) {
+            todayLine.style.height = `${totalVisibleHeight}px`;
+        }
     }
 
     function renderEmpty() {
@@ -507,6 +645,7 @@ document.addEventListener('DOMContentLoaded', function() {
         gridContainer.append(weekdays, grid); calendarView.append(header, gridContainer);
     }
 
+    // 改进的甘特图渲染，修复网格线问题
     function renderGantt(tasksToRender) {
         ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
         ganttGrid.innerHTML = `<div class="gantt-timeline"><div class="gantt-months"></div><div class="gantt-days"></div></div><div class="gantt-rows"></div>`;
@@ -519,8 +658,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const allDates = allTasks.flatMap(t => t.courseStart && t.courseEnd ? [parseDate(t.courseStart), parseDate(t.courseEnd)] : []).filter(Boolean);
         const minDate = new Date(Math.min(...allDates)); const maxDate = new Date(Math.max(...allDates));
         maxDate.setUTCDate(maxDate.getUTCDate() + 7);
-        const ganttGridLines = document.createElement('div'); ganttGridLines.className = 'gantt-grid-lines';
+        
+        // 创建网格线容器
+        const ganttGridLines = document.createElement('div'); 
+        ganttGridLines.className = 'gantt-grid-lines';
         ganttRows.appendChild(ganttGridLines);
+        
         let currentDate = new Date(minDate); let months = {}; let dayIndex = 0;
         while (currentDate <= maxDate) {
             const dayEl = document.createElement('div'); dayEl.className = 'gantt-day'; dayEl.textContent = currentDate.getUTCDate(); ganttDays.appendChild(dayEl);
@@ -574,6 +717,12 @@ document.addEventListener('DOMContentLoaded', function() {
             todayLine.style.display = 'block';
             ganttRows.appendChild(todayLine);
         }
+        
+        // 确保网格线正确显示
+        setTimeout(refreshGridLines, 100);
+        
+        // 添加窗口大小变化时刷新网格线
+        window.addEventListener('resize', refreshGridLines);
     }
     
     // 页面加载时，自动执行数据加载和初始化函数
