@@ -69,7 +69,7 @@
         .gantt-chart { display: flex; align-items: flex-start; width: 100%; height: 100%; }
         .gantt-tasks { flex-shrink: 0; width: 260px; border-right: 1px solid var(--medium-gray); background: #fdfdfd; position: sticky; left: 0; z-index: 20; }
         .gantt-task-header { height: 80px; display: flex; align-items: center; justify-content: center; padding: 10px; border-bottom: 1px solid var(--medium-gray); font-weight: bold; box-sizing: border-box; position: sticky; top: 0; background: #fdfdfd; z-index: 21; }
-        .gantt-task-group-header, .gantt-task-item, .gantt-row { transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, height 0.3s ease, padding 0.3s ease, border 0.3s ease; }
+        .gantt-task-group-header, .gantt-task-item, .gantt-row { transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out; }
         .gantt-task-group-header { height: 50px; padding: 0 15px; display: flex; align-items: center; border-bottom: 1px solid var(--medium-gray); font-weight: 600; background-color: var(--header-bg); box-sizing: border-box; cursor: pointer; }
         .gantt-task-group-header .toggle-icon { margin-right: 8px; font-family: monospace; transition: transform 0.2s; display: inline-block; }
         .gantt-task-group-header.collapsed .toggle-icon { transform: rotate(-90deg); }
@@ -84,7 +84,7 @@
         .gantt-day { height: 40px; width: 40px; font-size: 0.75em; }
         .gantt-rows { position: relative; }
         
-        /* 修改的行样式，处理折叠状态 */
+        /* 修改折叠样式，改为完全不占用空间 */
         .gantt-row { 
             height: 50px; 
             box-sizing: border-box; 
@@ -92,27 +92,16 @@
             overflow: hidden;
             position: relative;
             background: var(--bg-color);
-            transition: height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, margin 0.3s ease;
         }
         .gantt-row.group-header-row { background-color: var(--header-bg); border-bottom: 1px solid var(--medium-gray); }
         
-        /* 修改折叠样式，保持网格线可见性 */
-        .gantt-row.collapsed { 
-            height: 0px; 
-            padding: 0; 
-            border: none; 
-            opacity: 0;
-            pointer-events: none;
-        }
-        .gantt-task-item.collapsed {
-            height: 0px;
-            padding: 0;
-            border: none;
-            opacity: 0;
-            pointer-events: none;
+        /* 重要：使用display:none完全移出布局流 */
+        .gantt-row.collapsed, 
+        .gantt-task-item.collapsed,
+        .gantt-bar.collapsed { 
+            display: none !important;
         }
 
-        /* 修改网格线样式，确保始终可见 */
         .gantt-grid-lines { 
             position: absolute; 
             top: 0; 
@@ -129,8 +118,6 @@
             border-left: 1px dashed var(--medium-gray); 
             z-index: 1;
         }
-        
-        .gantt-bar.collapsed { opacity: 0; pointer-events: none; }
         
         .gantt-bar { 
             box-sizing: border-box; 
@@ -342,7 +329,6 @@ document.addEventListener('DOMContentLoaded', function() {
     ganttViewBtn.addEventListener('click', () => switchView('gantt'));
     calendarViewBtn.addEventListener('click', () => switchView('calendar'));
 
-    // 改进的视图切换函数，添加过渡效果
     function switchView(view) {
         if (currentView === view) return; // 如果已经是当前视图，不做任何操作
         
@@ -499,7 +485,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function hideTooltip() { tooltip.classList.remove('visible'); }
     function updateTooltipPosition(event) { tooltip.style.left = `${event.clientX}px`; tooltip.style.top = `${event.clientY - 15}px`; }
 
-    // 改进的折叠/展开函数，修复网格线问题
+    // 简化的折叠/展开函数
     function toggleGroup(groupName) {
         if (collapsedGroups.has(groupName)) {
             collapsedGroups.delete(groupName);
@@ -507,50 +493,8 @@ document.addEventListener('DOMContentLoaded', function() {
             collapsedGroups.add(groupName);
         }
         
-        // 处理折叠/展开状态
-        document.querySelectorAll(`[data-group-name='${groupName}']`).forEach(el => {
-            el.classList.toggle('collapsed');
-        });
-        
-        // 刷新网格线
-        setTimeout(refreshGridLines, 300); // 等待过渡动画完成
-    }
-
-    // 新增：刷新网格线函数
-    function refreshGridLines() {
-        if (currentView !== 'gantt') return;
-        
-        const ganttRows = document.querySelector('.gantt-rows');
-        if (!ganttRows) return;
-        
-        const gridLines = ganttRows.querySelector('.gantt-grid-lines');
-        if (!gridLines) return;
-        
-        // 计算可见行的总高度
-        const visibleRows = Array.from(document.querySelectorAll('.gantt-row:not(.collapsed)'));
-        
-        // 确保有可见行
-        if (visibleRows.length === 0) return;
-        
-        // 更新网格容器高度，确保覆盖所有可见行
-        const totalVisibleHeight = visibleRows.reduce((sum, row) => {
-            return sum + row.offsetHeight;
-        }, 0);
-        
-        // 设置网格线容器高度
-        gridLines.style.height = `${totalVisibleHeight}px`;
-        
-        // 确保网格线正确对齐和显示
-        const gridLineElements = gridLines.querySelectorAll('.gantt-grid-line');
-        gridLineElements.forEach(line => {
-            line.style.height = `${totalVisibleHeight}px`;
-        });
-        
-        // 确保今日线也正确显示
-        const todayLine = ganttRows.querySelector('.gantt-today-line');
-        if (todayLine) {
-            todayLine.style.height = `${totalVisibleHeight}px`;
-        }
+        // 触发重新渲染以正确处理折叠状态
+        applyFilters();
     }
 
     function renderEmpty() {
@@ -645,7 +589,6 @@ document.addEventListener('DOMContentLoaded', function() {
         gridContainer.append(weekdays, grid); calendarView.append(header, gridContainer);
     }
 
-    // 改进的甘特图渲染，修复网格线问题
     function renderGantt(tasksToRender) {
         ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
         ganttGrid.innerHTML = `<div class="gantt-timeline"><div class="gantt-months"></div><div class="gantt-days"></div></div><div class="gantt-rows"></div>`;
@@ -654,7 +597,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const ganttRows = ganttGrid.querySelector('.gantt-rows');
         const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
         const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+        
         if (allTasks.length === 0) { ganttRows.innerHTML = '<div class="empty-state">没有数据可供显示。</div>'; return; }
+        
         const allDates = allTasks.flatMap(t => t.courseStart && t.courseEnd ? [parseDate(t.courseStart), parseDate(t.courseEnd)] : []).filter(Boolean);
         const minDate = new Date(Math.min(...allDates)); const maxDate = new Date(Math.max(...allDates));
         maxDate.setUTCDate(maxDate.getUTCDate() + 7);
@@ -673,40 +618,127 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!months[monthKey]) { months[monthKey] = { name: `${currentDate.getUTCFullYear()}年 ${currentDate.getUTCMonth() + 1}月`, days: 0 }; }
             months[monthKey].days++; currentDate.setUTCDate(currentDate.getUTCDate() + 1); dayIndex++;
         }
-        for (const key in months) { const month = months[key]; const monthEl = document.createElement('div'); monthEl.className = 'gantt-month'; monthEl.textContent = month.name; monthEl.style.width = `${month.days * dayWidth}px`; ganttMonths.appendChild(monthEl); }
-        if (tasksToRender.length === 0) {
-            ganttRows.innerHTML += '<div class="empty-state">没有符合条件的任务。</div>';
-        } else {
-            const groupedTasks = tasksToRender.reduce((acc, task) => { (acc[task.teacher] = acc[task.teacher] || []).push(task); return acc; }, {});
-            const sortedTeachers = Object.keys(groupedTasks).map(teacher => { const tasks = groupedTasks[teacher]; tasks.sort((a, b) => parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime()); return { teacher, tasks, taskCount: tasks.length, minDate: new Date(Math.min(...tasks.map(t => parseDate(t.courseStart).getTime()))) }; });
-            sortedTeachers.sort((a, b) => { if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount; return a.minDate.getTime() - b.minDate.getTime(); });
-            let rowIndex = 0;
-            sortedTeachers.forEach(({ teacher, tasks }) => {
-                const isCollapsed = collapsedGroups.has(teacher);
-                const groupHeaderEl = document.createElement('div'); groupHeaderEl.className = `gantt-task-group-header ${isCollapsed ? 'collapsed' : ''}`; groupHeaderEl.innerHTML = `<span class="toggle-icon">▼</span>${teacher}`; groupHeaderEl.dataset.rowIndex = rowIndex; groupHeaderEl.dataset.groupName = teacher; groupHeaderEl.addEventListener('click', () => toggleGroup(teacher)); ganttTasksContainer.appendChild(groupHeaderEl);
-                const headerRowEl = document.createElement('div'); headerRowEl.className = 'gantt-row group-header-row'; headerRowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; headerRowEl.dataset.rowIndex = rowIndex; ganttRows.appendChild(headerRowEl);
-                rowIndex++;
-                tasks.forEach(task => {
-                    const taskItemEl = document.createElement('div'); taskItemEl.className = `gantt-task-item ${isCollapsed ? 'collapsed' : ''}`; taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session}</div>`; taskItemEl.dataset.rowIndex = rowIndex; taskItemEl.dataset.groupName = teacher; ganttTasksContainer.appendChild(taskItemEl);
-                    const rowEl = document.createElement('div'); rowEl.className = `gantt-row ${isCollapsed ? 'collapsed' : ''}`; rowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; rowEl.dataset.rowIndex = rowIndex; rowEl.dataset.groupName = teacher; ganttRows.appendChild(rowEl);
-                    
-                    const courseStartOffset = diffDays(minDate, parseDate(task.courseStart)); const courseDuration = diffDays(parseDate(task.courseStart), parseDate(task.courseEnd)) + 1;
-                    const courseBar = document.createElement('div'); courseBar.className = `gantt-bar gantt-bar-course ${isCollapsed ? 'collapsed' : ''}`; courseBar.style.top = `${rowIndex * 50}px`; courseBar.style.left = `${courseStartOffset * dayWidth}px`; courseBar.style.width = `${courseDuration * dayWidth}px`; courseBar.style.backgroundColor = topicColors[task.topic];
-                    courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
-                    courseBar.dataset.rowIndex = rowIndex; courseBar.dataset.groupName = teacher; ganttRows.appendChild(courseBar); addInteractionListeners(task, courseBar, true);
-                    
-                    if (task.sessionStart && task.sessionEnd) {
-                        const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
-                        const sessionBar = document.createElement('div'); sessionBar.className = `gantt-bar gantt-bar-session ${isCollapsed ? 'collapsed' : ''}`; sessionBar.style.top = `${rowIndex * 50}px`; sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; sessionBar.style.width = `${sessionDuration * dayWidth}px`; sessionBar.style.backgroundColor = topicColors[task.topic];
-                        sessionBar.textContent = task.session;
-                        sessionBar.dataset.rowIndex = rowIndex; sessionBar.dataset.groupName = teacher; ganttRows.appendChild(sessionBar); addInteractionListeners(task, sessionBar, false);
-                    }
-                    rowIndex++;
-                });
-            });
+        
+        for (const key in months) { 
+            const month = months[key]; 
+            const monthEl = document.createElement('div'); 
+            monthEl.className = 'gantt-month'; 
+            monthEl.textContent = month.name; 
+            monthEl.style.width = `${month.days * dayWidth}px`; 
+            ganttMonths.appendChild(monthEl); 
         }
         
-        // 改进今日线显示
+        if (tasksToRender.length === 0) {
+            ganttRows.innerHTML += '<div class="empty-state">没有符合条件的任务。</div>';
+            return;
+        }
+        
+        const groupedTasks = tasksToRender.reduce((acc, task) => { 
+            (acc[task.teacher] = acc[task.teacher] || []).push(task); 
+            return acc; 
+        }, {});
+        
+        const sortedTeachers = Object.keys(groupedTasks).map(teacher => { 
+            const tasks = groupedTasks[teacher]; 
+            tasks.sort((a, b) => parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime()); 
+            return { 
+                teacher, 
+                tasks, 
+                taskCount: tasks.length, 
+                minDate: new Date(Math.min(...tasks.map(t => parseDate(t.courseStart).getTime()))) 
+            }; 
+        });
+        
+        sortedTeachers.sort((a, b) => { 
+            if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount; 
+            return a.minDate.getTime() - b.minDate.getTime(); 
+        });
+        
+        // 绘制行和任务，处理折叠状态
+        let displayRowIndex = 0; // 实际显示的行索引（可见行）
+        let totalRowIndex = 0;   // 总的逻辑行索引（包括折叠的行）
+        
+        sortedTeachers.forEach(({ teacher, tasks }) => {
+            const isGroupCollapsed = collapsedGroups.has(teacher);
+            
+            // 绘制组标题行（始终显示）
+            const groupHeaderEl = document.createElement('div'); 
+            groupHeaderEl.className = `gantt-task-group-header`; 
+            groupHeaderEl.innerHTML = `<span class="toggle-icon">${isGroupCollapsed ? '►' : '▼'}</span>${teacher}`; 
+            groupHeaderEl.dataset.rowIndex = displayRowIndex; 
+            groupHeaderEl.dataset.groupName = teacher; 
+            groupHeaderEl.addEventListener('click', () => toggleGroup(teacher)); 
+            ganttTasksContainer.appendChild(groupHeaderEl);
+            
+            const headerRowEl = document.createElement('div'); 
+            headerRowEl.className = 'gantt-row group-header-row'; 
+            headerRowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; 
+            headerRowEl.dataset.rowIndex = displayRowIndex; 
+            ganttRows.appendChild(headerRowEl);
+            
+            displayRowIndex++; // 组标题行算一行
+            totalRowIndex++;
+            
+            // 只有当组未折叠时才绘制任务
+            if (!isGroupCollapsed) {
+                tasks.forEach(task => {
+                    const taskItemEl = document.createElement('div'); 
+                    taskItemEl.className = 'gantt-task-item'; 
+                    taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session}</div>`; 
+                    taskItemEl.dataset.rowIndex = displayRowIndex; 
+                    taskItemEl.dataset.groupName = teacher; 
+                    ganttTasksContainer.appendChild(taskItemEl);
+                    
+                    const rowEl = document.createElement('div'); 
+                    rowEl.className = 'gantt-row'; 
+                    rowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; 
+                    rowEl.dataset.rowIndex = displayRowIndex; 
+                    rowEl.dataset.groupName = teacher; 
+                    ganttRows.appendChild(rowEl);
+                    
+                    // 计算课程条位置，注意使用显示行索引而非逻辑索引
+                    const courseStartOffset = diffDays(minDate, parseDate(task.courseStart)); 
+                    const courseDuration = diffDays(parseDate(task.courseStart), parseDate(task.courseEnd)) + 1;
+                    
+                    const courseBar = document.createElement('div'); 
+                    courseBar.className = 'gantt-bar gantt-bar-course'; 
+                    courseBar.style.top = `${displayRowIndex * 50}px`; // 使用显示行索引
+                    courseBar.style.left = `${courseStartOffset * dayWidth}px`; 
+                    courseBar.style.width = `${courseDuration * dayWidth}px`; 
+                    courseBar.style.backgroundColor = topicColors[task.topic];
+                    courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
+                    courseBar.dataset.rowIndex = displayRowIndex; 
+                    courseBar.dataset.groupName = teacher; 
+                    ganttRows.appendChild(courseBar); 
+                    addInteractionListeners(task, courseBar, true);
+                    
+                    if (task.sessionStart && task.sessionEnd) {
+                        const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); 
+                        const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
+                        
+                        const sessionBar = document.createElement('div'); 
+                        sessionBar.className = 'gantt-bar gantt-bar-session'; 
+                        sessionBar.style.top = `${displayRowIndex * 50}px`; // 使用显示行索引
+                        sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; 
+                        sessionBar.style.width = `${sessionDuration * dayWidth}px`; 
+                        sessionBar.style.backgroundColor = topicColors[task.topic];
+                        sessionBar.textContent = task.session;
+                        sessionBar.dataset.rowIndex = displayRowIndex; 
+                        sessionBar.dataset.groupName = teacher; 
+                        ganttRows.appendChild(sessionBar); 
+                        addInteractionListeners(task, sessionBar, false);
+                    }
+                    
+                    displayRowIndex++; // 每个任务一行
+                    totalRowIndex++;
+                });
+            } else {
+                // 当组折叠时，只增加总行索引，不增加显示行索引
+                totalRowIndex += tasks.length;
+            }
+        });
+        
+        // 今日线显示
         const today = new Date(); 
         const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
         if (todayUTC >= minDate && todayUTC <= maxDate) { 
@@ -718,11 +750,27 @@ document.addEventListener('DOMContentLoaded', function() {
             ganttRows.appendChild(todayLine);
         }
         
-        // 确保网格线正确显示
-        setTimeout(refreshGridLines, 100);
-        
-        // 添加窗口大小变化时刷新网格线
-        window.addEventListener('resize', refreshGridLines);
+        // 设置网格线高度
+        const ganttGridLinesEl = ganttRows.querySelector('.gantt-grid-lines');
+        if (ganttGridLinesEl) {
+            // 计算实际显示的总高度
+            const visibleRowsHeight = displayRowIndex * 50; // 每行50px
+            ganttGridLinesEl.style.height = `${visibleRowsHeight}px`;
+            
+            // 确保每条网格线都有正确的高度
+            const gridLines = ganttGridLinesEl.querySelectorAll('.gantt-grid-line');
+            gridLines.forEach(line => {
+                line.style.height = `${visibleRowsHeight}px`;
+            });
+            
+            // 今日线也需要正确高度
+            if (todayUTC >= minDate && todayUTC <= maxDate) {
+                const todayLine = ganttRows.querySelector('.gantt-today-line');
+                if (todayLine) {
+                    todayLine.style.height = `${visibleRowsHeight}px`;
+                }
+            }
+        }
     }
     
     // 页面加载时，自动执行数据加载和初始化函数
