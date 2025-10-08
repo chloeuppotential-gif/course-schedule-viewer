@@ -3,552 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>课程表</title>
-    <!-- 我们不再需要从CDN加载SheetJS，因为数据处理已在后台完成 -->
+    <title>课程表查看器</title>
     <style>
-        :root {
-            --primary-color: #3498db; --secondary-color: #2ecc71; --danger-color: #e74c3c;
-            --light-gray: #f4f7fa; --medium-gray: #e0e0e0; --dark-gray: #333;
-            --text-color: #333; --bg-color: #fff;
-            --header-bg: #f2f2f2;
-            --highlight-bg: #dcf4ff;
-            --dim-opacity: 0.4;
-            --today-bg: #fff2f2;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
         }
-        html, body {
-            height: 100%;
-            margin: 0;
-            overflow: hidden; 
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
         }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background-color: var(--light-gray); 
-            color: var(--text-color); 
-            padding: 10px;
-            box-sizing: border-box;
+        #schedule-container {
+            overflow-x: auto;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .app-container { 
+        table {
             width: 100%;
-            height: 100%;
-            max-width: 1800px; 
-            margin: 0 auto; 
-            background-color: var(--bg-color); 
-            border-radius: 8px; 
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
+            border-collapse: collapse;
+            min-width: 800px;
         }
-        
-        .control-panel { 
-            padding: 15px 25px; 
-            border-bottom: 1px solid var(--medium-gray); 
-            background-color: #fdfdfd; 
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-shrink: 0;
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
         }
-        .control-panel h2 { margin: 0; font-size: 1.2em; }
-        .view-switcher { margin-left: 20px; display: flex; gap: 5px; border: 1px solid #ccc; border-radius: 5px; padding: 2px; }
-        .view-switcher button { background: transparent; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-size: 0.9em; }
-        .view-switcher button.active { background-color: var(--primary-color); color: white; }
-        .control-panel .spacer { flex-grow: 1; }
-        #error-message { color: var(--danger-color); height: 1em; margin: 0; }
-
-        .filters-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; padding: 15px 25px; border-bottom: 1px solid var(--medium-gray); background-color: #f9fafb; flex-shrink: 0; }
-        .filters-container select, .filters-container input[type="date"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
-        .filters-container .date-filter-label { font-size: 0.9em; color: #555; }
-        #reset-filters-button { padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; cursor: pointer; }
-
-        .view-container { flex-grow: 1; overflow: auto; position: relative; }
-        .view { display: none; }
-        .view.active { display: flex; flex-direction: column; height: 100%; }
-
-        /* --- 甘特图样式 (保持不变) --- */
-        #gantt-view.active { display: flex; flex-direction: row; }
-        .gantt-chart { display: flex; align-items: flex-start; width: 100%; height: 100%; }
-        .gantt-tasks { flex-shrink: 0; width: 260px; border-right: 1px solid var(--medium-gray); background: #fdfdfd; position: sticky; left: 0; z-index: 20; }
-        .gantt-task-header { height: 80px; display: flex; align-items: center; justify-content: center; padding: 10px; border-bottom: 1px solid var(--medium-gray); font-weight: bold; box-sizing: border-box; position: sticky; top: 0; background: #fdfdfd; z-index: 21; }
-        .gantt-task-group-header, .gantt-task-item, .gantt-row { transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, height 0.3s ease, padding 0.3s ease, border 0.3s ease; }
-        .gantt-task-group-header { height: 50px; padding: 0 15px; display: flex; align-items: center; border-bottom: 1px solid var(--medium-gray); font-weight: 600; background-color: var(--header-bg); box-sizing: border-box; cursor: pointer; }
-        .gantt-task-group-header .toggle-icon { margin-right: 8px; font-family: monospace; transition: transform 0.2s; display: inline-block; }
-        .gantt-task-group-header.collapsed .toggle-icon { transform: rotate(-90deg); }
-        .gantt-task-item { height: 50px; padding: 0 15px 0 30px; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid #f0f0f0; box-sizing: border-box; overflow: hidden; }
-        .task-topic { font-weight: 500; font-size: 0.9em; }
-        .task-session { font-size: 0.8em; color: #666; }
-        .gantt-grid { position: relative; display: flex; flex-direction: column; flex-grow: 1; }
-        .gantt-timeline { position: sticky; top: 0; z-index: 10; background: var(--bg-color); }
-        .gantt-months, .gantt-days { display: flex; }
-        .gantt-month, .gantt-day { flex-shrink: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--medium-gray); border-bottom: 1px solid var(--medium-gray); font-weight: bold; }
-        .gantt-month { height: 40px; font-size: 0.8em; }
-        .gantt-day { height: 40px; width: 40px; font-size: 0.75em; }
-        .gantt-rows { position: relative; }
-        .gantt-row { height: 50px; box-sizing: border-box; border-bottom: 1px solid #f0f0f0; overflow: hidden; }
-        .gantt-row.group-header-row { background-color: var(--header-bg); border-bottom: 1px solid var(--medium-gray); }
-        .gantt-task-item.collapsed, .gantt-row.collapsed { height: 0; padding-top: 0; padding-bottom: 0; border: none; }
-        .gantt-bar.collapsed { display: none; }
-        .gantt-grid-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-        .gantt-grid-line { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--medium-gray); }
-        .gantt-bar { box-sizing: border-box; position: absolute; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 10px; color: white; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s 0.2s; }
-        .gantt-task-item.highlight, .gantt-row.highlight, .gantt-task-group-header.highlight { background-color: var(--highlight-bg) !important; }
-        .gantt-chart.is-hovering .gantt-bar:not(.is-hovered) { opacity: var(--dim-opacity) !important; }
-        .gantt-bar-course { height: 30px; top: 10px; opacity: 0.3; z-index: 1; border: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; padding: 0 5px; }
-        .gantt-bar-course-label { font-size: 0.7em; color: #444; font-weight: 600; }
-        .gantt-bar-course-text { font-weight: bold; font-size: 0.8em; transition: opacity 0.2s ease-in-out; opacity: 0; color: var(--dark-gray); }
-        .gantt-bar-session { height: 22px; top: 14px; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .gantt-bar-session::before { content: ''; position: absolute; top: -14px; bottom: -14px; left: 0; right: 0; background: transparent; z-index: 1; }
-        .gantt-bar-session.is-hovered { transform: scale(1.05); z-index: 16; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
-        .gantt-bar-course.is-hovered { opacity: 0.9 !important; transform: scale(1.02); z-index: 17; transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
-        .gantt-bar-course.is-hovered .gantt-bar-course-text { opacity: 1; }
-        .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--danger-color); z-index: 5; display: none; }
-        
-        /* --- 日历视图样式 (保持不变) --- */
-        #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
-        .calendar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; position: relative; }
-        .calendar-header h3 { margin: 0; font-size: 1.5em; }
-        .calendar-nav { position: absolute; left: 0; display: flex; gap: 10px; }
-        .calendar-nav button { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; cursor: pointer; }
-        .calendar-grid-container { flex-grow: 1; display: grid; grid-template-rows: auto 1fr; }
-        .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; color: #666; padding-bottom: 10px; border-bottom: 1px solid var(--medium-gray); }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(120px, auto); border-left: 1px solid var(--medium-gray); }
-        .calendar-day { border-right: 1px solid var(--medium-gray); border-bottom: 1px solid var(--medium-gray); padding: 5px; overflow-y: auto; position: relative; }
-        .calendar-day.other-month .day-number { color: #ccc; }
-        .calendar-day.today { background-color: var(--today-bg); }
-        .day-number { font-weight: 500; margin-bottom: 5px; }
-        .calendar-day.today .day-number { color: var(--danger-color); font-weight: bold; }
-        .calendar-marker { font-size: 0.8em; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-        .marker-start { background-color: #27ae60; }
-        .marker-end { background-color: #c0392b; }
-        .marker-single-day { background-color: #3498db; }
-
-        .gantt-empty-state { display: flex; justify-content: center; align-items: center; width: 100%; height: 150px; color: #999; }
-        .tooltip { position: fixed; background-color: rgba(0, 0, 0, 0.8); color: white; padding: 10px 15px; border-radius: 5px; font-size: 0.9em; z-index: 100; pointer-events: none; opacity: 0; transform: translate(-50%, -100%); transition: opacity 0.1s ease; white-space: nowrap; }
-        .tooltip.visible { opacity: 1; }
-        .tooltip-row { display: flex; justify-content: space-between; padding: 2px 0; }
-        .tooltip-label { font-weight: bold; margin-right: 15px; }
-        .tooltip-value { color: #ddd; }
+        thead th {
+            background-color: #3498db;
+            color: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tbody tr:hover {
+            background-color: #f1c40f;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+        #loading, #error {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .controls input, .controls select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin: 0 5px;
+        }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <div class="control-panel">
-        <h2>课程表</h2>
-        <div class="view-switcher">
-            <button id="gantt-view-btn" class="active">甘特图</button>
-            <button id="calendar-view-btn">日历</button>
-        </div>
-        <div class="spacer"></div>
-        <!-- 我们不再需要上传按钮，但保留错误信息显示区域 -->
-        <p id="error-message"></p>
+    <h1>课程表</h1>
+    
+    <div class="controls">
+        <input type="text" id="search-input" placeholder="搜索任意内容...">
+        <select id="day-filter">
+            <option value="">所有星期</option>
+            <option value="星期一">星期一</option>
+            <option value="星期二">星期二</option>
+            <option value="星期三">星期三</option>
+            <option value="星期四">星期四</option>
+            <option value="星期五">星期五</option>
+            <option value="星期六">星期六</option>
+            <option value="星期日">星期日</option>
+        </select>
     </div>
-    <div class="filters-container">
-        <select id="filter-teacher"></select>
-        <select id="filter-topic"></select>
-        <span class="date-filter-label">日期范围:</span>
-        <input type="date" id="filter-date-start">
-        <span class="date-filter-label">至</span>
-        <input type="date" id="filter-date-end">
-        <button id="reset-filters-button">重置筛选</button>
+
+    <div id="schedule-container">
+        <div id="loading">正在加载课程数据...</div>
+        <div id="error" style="display: none;"></div>
+        <table id="schedule-table" style="display: none;">
+            <thead>
+                <tr id="table-header"></tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
     </div>
-    <div class="view-container">
-        <div id="gantt-view" class="view active">
-            <div class="gantt-chart">
-                <div class="gantt-tasks"></div>
-                <div class="gantt-grid"></div>
-            </div>
-        </div>
-        <div id="calendar-view" class="view">
-            <!-- 日历视图将由JS动态生成 -->
-        </div>
-    </div>
-</div>
-<div class="tooltip" id="tooltip"></div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("正在运行课程表 (自动加载版)...");
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const table = document.getElementById('schedule-table');
+            const tableHeader = document.getElementById('table-header');
+            const tableBody = document.getElementById('table-body');
+            const searchInput = document.getElementById('search-input');
+            const dayFilter = document.getElementById('day-filter');
 
-    let allTasks = [];
-    const topicColors = {};
-    const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#e84393', '#0984e3', '#6c5ce7', '#00b894'];
-    let dayWidth = 40;
-    const collapsedGroups = new Set();
+            let allData = [];
 
-    let currentView = 'gantt';
-    let currentDisplayDate = new Date();
-
-    const errorMessage = document.getElementById('error-message');
-    
-    const ganttView = document.getElementById('gantt-view');
-    const calendarView = document.getElementById('calendar-view');
-    const ganttTasksContainer = ganttView.querySelector('.gantt-tasks');
-    const ganttGrid = ganttView.querySelector('.gantt-grid');
-
-    const filterTeacher = document.getElementById('filter-teacher');
-    const filterTopic = document.getElementById('filter-topic');
-    const tooltip = document.getElementById('tooltip');
-
-    const filterDateStart = document.getElementById('filter-date-start');
-    const filterDateEnd = document.getElementById('filter-date-end');
-    const resetFiltersButton = document.getElementById('reset-filters-button');
-    
-    const ganttViewBtn = document.getElementById('gantt-view-btn');
-    const calendarViewBtn = document.getElementById('calendar-view-btn');
-
-    // 绑定筛选器和视图切换的事件
-    filterTeacher.addEventListener('change', applyFilters);
-    filterTopic.addEventListener('change', applyFilters);
-    filterDateStart.addEventListener('change', applyFilters);
-    filterDateEnd.addEventListener('change', applyFilters);
-    resetFiltersButton.addEventListener('click', () => {
-        filterTeacher.value = '所有教师';
-        filterTopic.value = '所有主题';
-        filterDateStart.value = '';
-        filterDateEnd.value = '';
-        currentDisplayDate = new Date();
-        applyFilters();
-    });
-
-    ganttViewBtn.addEventListener('click', () => switchView('gantt'));
-    calendarViewBtn.addEventListener('click', () => switchView('calendar'));
-
-    function switchView(view) {
-        currentView = view;
-        ganttViewBtn.classList.toggle('active', view === 'gantt');
-        calendarViewBtn.classList.toggle('active', view === 'calendar');
-        ganttView.classList.toggle('active', view === 'gantt');
-        calendarView.classList.toggle('active', view === 'calendar');
-        applyFilters();
-    }
-    
-    // *** 核心修改：自动加载数据函数 ***
-    function loadAndRenderData() {
-        // 添加一个 cache-busting 参数，防止浏览器缓存旧的 data.json
-        const dataUrl = `data.json?t=${new Date().getTime()}`;
-        
-        errorMessage.textContent = '正在加载课程数据...';
-
-        fetch(dataUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`加载数据失败，请检查 data.json 文件是否存在。 (状态: ${response.status})`);
-                }
-                return response.json();
-            })
-            .then(jsonData => {
-                errorMessage.textContent = ''; // 清除加载提示
-                
-                // 使用与之前完全相同的处理逻辑
-                allTasks = processExcelData(jsonData);
-                
-                if (allTasks.length === 0) {
-                    throw new Error("数据文件为空或格式不正确。请检查 Excel 文件内容。");
-                }
-                
-                collapsedGroups.clear();
-                currentDisplayDate = allTasks.length > 0 ? new Date(allTasks[0].sessionStart + 'T00:00:00') : new Date();
-                
-                // 触发一次重置和渲染
-                resetFiltersButton.click();
-            })
-            .catch(err => {
-                errorMessage.textContent = err.message;
-                console.error(err);
-                renderEmpty(); // 显示空状态
-            });
-    }
-
-    // 这个函数保持不变，它负责将后台生成的JSON数据转换成程序需要的格式
-    function processExcelData(data) {
-        const processedTasks = [];
-        let currentTeacher = '', currentTopic = '', currentCourseStart = null, currentCourseEnd = null;
-        
-        // Excel 日期解析修正：Excel 存储日期为数字，SheetJS 库会将其转换为JS Date对象。
-        // 如果后台脚本已经处理成 YYYY-MM-DD 字符串，则直接使用。
-        // 如果是 Date 对象，则需要格式化。
-        const formatDateFromData = (dateInput) => {
-            if (!dateInput) return null;
-            // 如果已经是 YYYY-MM-DD 格式的字符串
-            if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-                return dateInput;
-            }
-            // 如果是JS Date对象
-            if (dateInput instanceof Date && !isNaN(dateInput)) {
-                return formatDate(dateInput);
-            }
-            // 如果是Excel的序列号数字（不常见，但作为备用）
-            if (typeof dateInput === 'number') {
-                 const d = new Date(Date.UTC(1900, 0, dateInput - 1));
-                 return formatDate(d);
-            }
-            // 其他情况，尝试直接创建Date对象
-            const d = new Date(dateInput);
-            if (!isNaN(d)) {
-                return formatDate(d);
-            }
-
-            return null;
-        };
-
-        data.forEach(row => {
-            if (Object.values(row).every(val => val === null || String(val).trim() === '')) return;
-            if (row['任课教师'] && String(row['任课教师']).trim() !== '') { currentTeacher = String(row['任课教师']).trim(); currentTopic = ''; currentCourseStart = null; currentCourseEnd = null; }
-            if (row['教学主题'] && String(row['教学主题']).trim() !== '') { currentTopic = String(row['教学主题']).trim(); currentCourseStart = null; currentCourseEnd = null; }
-            
-            const rowCourseStart = formatDateFromData(row['开课日期']);
-            const rowCourseEnd = formatDateFromData(row['结课日期']);
-            
-            if (rowCourseStart && rowCourseEnd) { currentCourseStart = rowCourseStart; currentCourseEnd = rowCourseEnd; }
-            
-            const sessionStart = formatDateFromData(row['起始日期']);
-            const sessionEnd = formatDateFromData(row['结束日期']);
-            
-            if (currentTeacher && currentTopic && currentCourseStart && currentCourseEnd && sessionStart && sessionEnd) {
-                processedTasks.push({ teacher: currentTeacher, topic: currentTopic, session: row['课时'] ? String(row['课时']).trim() : 'N/A', courseStart: currentCourseStart, courseEnd: currentCourseEnd, sessionStart: sessionStart, sessionEnd: sessionEnd });
-            }
-        });
-        return processedTasks;
-    }
-
-    // 格式化Date对象为 'YYYY-MM-DD'
-    function formatDate(date) {
-        if (!date || isNaN(new Date(date))) return null;
-        const d = new Date(date);
-        // 修正时区问题，确保日期不会因为时区偏移而改变
-        const userTimezoneOffset = d.getTimezoneOffset() * 60000;
-        const correctedDate = new Date(d.getTime() + userTimezoneOffset);
-        const year = correctedDate.getFullYear();
-        const month = String(correctedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(correctedDate.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    // 以下所有渲染和交互函数 (populateFilterDropdown, applyFilters, 等) 保持原样，无需修改
-    // ... (所有原有的渲染和交互函数) ...
-    function populateFilterDropdown(selectElement, options, currentlySelected) {
-        const finalSelection = options.includes(currentlySelected) ? currentlySelected : options[0];
-        selectElement.innerHTML = options.map(option => `<option value="${option}" ${option === finalSelection ? 'selected' : ''}>${option}</option>`).join('');
-        return finalSelection;
-    }
-
-    function applyFilters() {
-        if (allTasks.length === 0) {
-            filterTeacher.innerHTML = ''; filterTopic.innerHTML = '';
-            renderEmpty();
-            return;
-        }
-        const currentSelectedTeacher = filterTeacher.value || '所有教师';
-        const currentSelectedTopic = filterTopic.value || '所有主题';
-        const dateStart = filterDateStart.value;
-        const dateEnd = filterDateEnd.value;
-        const teacherFilteredTasks = (currentSelectedTopic === '所有主题') ? allTasks : allTasks.filter(t => t.topic === currentSelectedTopic);
-        const availableTeachers = ['所有教师', ...new Set(teacherFilteredTasks.map(t => t.teacher))];
-        const topicFilteredTasks = (currentSelectedTeacher === '所有教师') ? allTasks : allTasks.filter(t => t.teacher === currentSelectedTeacher);
-        const availableTopics = ['所有主题', ...new Set(topicFilteredTasks.map(t => t.topic))];
-        const finalSelectedTeacher = populateFilterDropdown(filterTeacher, availableTeachers, currentSelectedTeacher);
-        const finalSelectedTopic = populateFilterDropdown(filterTopic, availableTopics, currentSelectedTopic);
-        const tasksToRender = allTasks.filter(task => {
-            const teacherMatch = (finalSelectedTeacher === '所有教师' || task.teacher === finalSelectedTeacher);
-            const topicMatch = (finalSelectedTopic === '所有主题' || task.topic === finalSelectedTopic);
-            const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && (!dateEnd || task.sessionStart <= dateEnd);
-            return teacherMatch && topicMatch && dateMatch;
-        });
-        updateColors();
-        
-        if (currentView === 'gantt') {
-            renderGantt(tasksToRender);
-        } else {
-            renderCalendar(tasksToRender);
-        }
-    }
-    
-    function updateColors() {
-        [...new Set(allTasks.map(t => t.topic))].sort().forEach((topic) => {
-            if (!topicColors[topic]) { topicColors[topic] = colors[Object.keys(topicColors).length % colors.length]; }
-        });
-    }
-
-    function addInteractionListeners(task, element, isCourseBar = false) {
-        element.addEventListener('mouseover', (e) => {
-            if (currentView === 'gantt') {
-                const rowIndex = element.dataset.rowIndex; if (!rowIndex) return;
-                const relatedElements = document.querySelectorAll(`[data-row-index='${rowIndex}']`);
-                ganttView.querySelector('.gantt-chart').classList.add('is-hovering');
-                element.classList.add('is-hovered'); 
-                relatedElements.forEach(el => el.classList.add('highlight'));
-            }
-            showTooltip(e, task, isCourseBar);
-        });
-        element.addEventListener('mousemove', (e) => { updateTooltipPosition(e); });
-        element.addEventListener('mouseout', () => {
-            if (currentView === 'gantt') {
-                const rowIndex = element.dataset.rowIndex; if (!rowIndex) return;
-                const relatedElements = document.querySelectorAll(`[data-row-index='${rowIndex}']`);
-                ganttView.querySelector('.gantt-chart').classList.remove('is-hovering');
-                element.classList.remove('is-hovered');
-                relatedElements.forEach(el => el.classList.remove('highlight'));
-            }
-            hideTooltip();
-        });
-    }
-
-    function showTooltip(event, task, isCourseBar) {
-        const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
-        const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
-        let title, start, end, duration;
-        if (isCourseBar) { title = "课程总览"; start = task.courseStart; end = task.courseEnd; duration = diffDays(parseDate(start), parseDate(end)); } 
-        else { title = `课时: ${task.session}`; start = task.sessionStart; end = task.sessionEnd; duration = diffDays(parseDate(start), parseDate(end)); }
-        tooltip.innerHTML = `<div class="tooltip-row"><span class="tooltip-label">${title}</span></div><hr style="border-color: #555; border-style: solid; margin: 5px 0;"><div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${task.topic}</span></div><div class="tooltip-row"><span class="tooltip-label">负责人:</span> <span class="tooltip-value">${task.teacher}</span></div><div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div><div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div><div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration} 天</span></div>`;
-        updateTooltipPosition(event);
-        tooltip.classList.add('visible');
-    }
-    
-    function hideTooltip() { tooltip.classList.remove('visible'); }
-    function updateTooltipPosition(event) { tooltip.style.left = `${event.clientX}px`; tooltip.style.top = `${event.clientY - 15}px`; }
-
-    function toggleGroup(groupName) {
-        if (collapsedGroups.has(groupName)) { collapsedGroups.delete(groupName); } 
-        else { collapsedGroups.add(groupName); }
-        document.querySelectorAll(`[data-group-name='${groupName}']`).forEach(el => { el.classList.toggle('collapsed'); });
-    }
-
-    function renderEmpty() {
-        if (currentView === 'gantt') {
-            ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
-            ganttGrid.innerHTML = '<div class="gantt-empty-state">没有课程数据。</div>';
-        } else {
-            calendarView.innerHTML = '<div class="gantt-empty-state">没有课程数据。</div>';
-        }
-    }
-
-    function renderCalendar(tasksToRender) {
-        calendarView.innerHTML = '';
-        const header = document.createElement('div'); header.className = 'calendar-header';
-        const nav = document.createElement('div'); nav.className = 'calendar-nav';
-        const prevBtn = document.createElement('button'); prevBtn.textContent = '‹ 上个月';
-        const todayBtn = document.createElement('button'); todayBtn.textContent = '今天';
-        const nextBtn = document.createElement('button'); nextBtn.textContent = '下个月 ›';
-        nav.append(prevBtn, todayBtn, nextBtn);
-        prevBtn.onclick = () => { currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1); applyFilters(); };
-        todayBtn.onclick = () => { currentDisplayDate = new Date(); applyFilters(); };
-        nextBtn.onclick = () => { currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1); applyFilters(); };
-        const title = document.createElement('h3'); title.textContent = `${currentDisplayDate.getFullYear()}年 ${currentDisplayDate.getMonth() + 1}月`;
-        header.append(nav, title);
-        const gridContainer = document.createElement('div'); gridContainer.className = 'calendar-grid-container';
-        const weekdays = document.createElement('div'); weekdays.className = 'calendar-weekdays';
-        ['日', '一', '二', '三', '四', '五', '六'].forEach(day => { const dayEl = document.createElement('div'); dayEl.textContent = day; weekdays.appendChild(dayEl); });
-        const grid = document.createElement('div'); grid.className = 'calendar-grid';
-        const year = currentDisplayDate.getFullYear(); const month = currentDisplayDate.getMonth();
-        const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0);
-        const daysInMonth = lastDay.getDate(); const startDayOfWeek = firstDay.getDay();
-        for (let i = 0; i < startDayOfWeek; i++) { const dayCell = document.createElement('div'); dayCell.className = 'calendar-day other-month'; grid.appendChild(dayCell); }
-        const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        for (let i = 1; i <= daysInMonth; i++) {
-            const dayCell = document.createElement('div'); dayCell.className = 'calendar-day';
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-            dayCell.dataset.date = dateStr;
-            if (dateStr === todayStr) dayCell.classList.add('today');
-            const dayNumber = document.createElement('div'); dayNumber.className = 'day-number'; dayNumber.textContent = i;
-            dayCell.appendChild(dayNumber); grid.appendChild(dayCell);
-        }
-        
-        const processedCourses = new Set(); 
-        tasksToRender.forEach(task => {
-            const courseKey = `${task.teacher}-${task.topic}-${task.courseStart}-${task.courseEnd}`;
-            if (processedCourses.has(courseKey)) return;
-            processedCourses.add(courseKey);
-            const courseStartDate = new Date(task.courseStart + 'T00:00:00'); const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
-            if (task.courseStart === task.courseEnd) {
-                if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
-                    const dayCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                    if (dayCell) { const marker = document.createElement('div'); marker.className = 'calendar-marker marker-single-day'; marker.textContent = `${task.teacher} - ${task.topic} (开/结课)`; addInteractionListeners(task, marker, true); dayCell.appendChild(marker); }
-                }
-            } else {
-                if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
-                    const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                    if (startCell) { const marker = document.createElement('div'); marker.className = 'calendar-marker marker-start'; marker.textContent = `${task.teacher} - ${task.topic} (开课)`; addInteractionListeners(task, marker, true); startCell.appendChild(marker); }
-                }
-                if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
-                    const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
-                    if (endCell) { const marker = document.createElement('div'); marker.className = 'calendar-marker marker-end'; marker.textContent = `${task.teacher} - ${task.topic} (结课)`; addInteractionListeners(task, marker, true); endCell.appendChild(marker); }
-                }
-            }
-        });
-        gridContainer.append(weekdays, grid); calendarView.append(header, gridContainer);
-    }
-
-    function renderGantt(tasksToRender) {
-        ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
-        ganttGrid.innerHTML = `<div class="gantt-timeline"><div class="gantt-months"></div><div class="gantt-days"></div></div><div class="gantt-rows"></div>`;
-        const ganttMonths = ganttGrid.querySelector('.gantt-months');
-        const ganttDays = ganttGrid.querySelector('.gantt-days');
-        const ganttRows = ganttGrid.querySelector('.gantt-rows');
-        const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
-        const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-        if (allTasks.length === 0) { ganttRows.innerHTML = '<div class="gantt-empty-state">没有课程数据。</div>'; return; }
-        const allDates = allTasks.flatMap(t => t.courseStart && t.courseEnd ? [parseDate(t.courseStart), parseDate(t.courseEnd)] : []).filter(Boolean);
-        const minDate = new Date(Math.min(...allDates)); const maxDate = new Date(Math.max(...allDates));
-        maxDate.setUTCDate(maxDate.getUTCDate() + 7);
-        const ganttGridLines = document.createElement('div'); ganttGridLines.className = 'gantt-grid-lines';
-        ganttRows.appendChild(ganttGridLines);
-        let currentDate = new Date(minDate); let months = {}; let dayIndex = 0;
-        while (currentDate <= maxDate) {
-            const dayEl = document.createElement('div'); dayEl.className = 'gantt-day'; dayEl.textContent = currentDate.getUTCDate(); ganttDays.appendChild(dayEl);
-            const lineEl = document.createElement('div'); lineEl.className = 'gantt-grid-line'; lineEl.style.left = `${(dayIndex + 1) * dayWidth}px`;
-            ganttGridLines.appendChild(lineEl);
-            const monthKey = `${currentDate.getUTCFullYear()}-${currentDate.getUTCMonth()}`;
-            if (!months[monthKey]) { months[monthKey] = { name: `${currentDate.getUTCFullYear()}年 ${currentDate.getUTCMonth() + 1}月`, days: 0 }; }
-            months[monthKey].days++; currentDate.setUTCDate(currentDate.getUTCDate() + 1); dayIndex++;
-        }
-        for (const key in months) { const month = months[key]; const monthEl = document.createElement('div'); monthEl.className = 'gantt-month'; monthEl.textContent = month.name; monthEl.style.width = `${month.days * dayWidth}px`; ganttMonths.appendChild(monthEl); }
-        if (tasksToRender.length === 0) {
-            ganttRows.innerHTML += '<div class="gantt-empty-state">没有符合条件的任务。</div>';
-        } else {
-            const groupedTasks = tasksToRender.reduce((acc, task) => { (acc[task.teacher] = acc[task.teacher] || []).push(task); return acc; }, {});
-            const sortedTeachers = Object.keys(groupedTasks).map(teacher => { const tasks = groupedTasks[teacher]; tasks.sort((a, b) => parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime()); return { teacher, tasks, taskCount: tasks.length, minDate: new Date(Math.min(...tasks.map(t => parseDate(t.courseStart).getTime()))) }; });
-            sortedTeachers.sort((a, b) => { if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount; return a.minDate.getTime() - b.minDate.getTime(); });
-            let rowIndex = 0;
-            sortedTeachers.forEach(({ teacher, tasks }) => {
-                const isCollapsed = collapsedGroups.has(teacher);
-                const groupHeaderEl = document.createElement('div'); groupHeaderEl.className = `gantt-task-group-header ${isCollapsed ? 'collapsed' : ''}`; groupHeaderEl.innerHTML = `<span class="toggle-icon">▼</span>${teacher}`; groupHeaderEl.dataset.rowIndex = rowIndex; groupHeaderEl.dataset.groupName = teacher; groupHeaderEl.addEventListener('click', () => toggleGroup(teacher)); ganttTasksContainer.appendChild(groupHeaderEl);
-                const headerRowEl = document.createElement('div'); headerRowEl.className = 'gantt-row group-header-row'; headerRowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; headerRowEl.dataset.rowIndex = rowIndex; ganttRows.appendChild(headerRowEl);
-                rowIndex++;
-                tasks.forEach(task => {
-                    const taskItemEl = document.createElement('div'); taskItemEl.className = `gantt-task-item ${isCollapsed ? 'collapsed' : ''}`; taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session}</div>`; taskItemEl.dataset.rowIndex = rowIndex; taskItemEl.dataset.groupName = teacher; ganttTasksContainer.appendChild(taskItemEl);
-                    const rowEl = document.createElement('div'); rowEl.className = `gantt-row ${isCollapsed ? 'collapsed' : ''}`; rowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; rowEl.dataset.rowIndex = rowIndex; rowEl.dataset.groupName = teacher; ganttRows.appendChild(rowEl);
-                    
-                    const courseStartOffset = diffDays(minDate, parseDate(task.courseStart)); const courseDuration = diffDays(parseDate(task.courseStart), parseDate(task.courseEnd)) + 1;
-                    const courseBar = document.createElement('div'); courseBar.className = `gantt-bar gantt-bar-course ${isCollapsed ? 'collapsed' : ''}`; courseBar.style.top = `${rowIndex * 50}px`; courseBar.style.left = `${courseStartOffset * dayWidth}px`; courseBar.style.width = `${courseDuration * dayWidth}px`; courseBar.style.backgroundColor = topicColors[task.topic];
-                    courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
-                    courseBar.dataset.rowIndex = rowIndex; courseBar.dataset.groupName = teacher; ganttRows.appendChild(courseBar); addInteractionListeners(task, courseBar, true);
-                    
-                    if (task.sessionStart && task.sessionEnd) {
-                        const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
-                        const sessionBar = document.createElement('div'); sessionBar.className = `gantt-bar gantt-bar-session ${isCollapsed ? 'collapsed' : ''}`; sessionBar.style.top = `${rowIndex * 50}px`; sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; sessionBar.style.width = `${sessionDuration * dayWidth}px`; sessionBar.style.backgroundColor = topicColors[task.topic];
-                        sessionBar.textContent = task.session;
-                        sessionBar.dataset.rowIndex = rowIndex; sessionBar.dataset.groupName = teacher; ganttRows.appendChild(sessionBar); addInteractionListeners(task, sessionBar, false);
+            async function fetchSchedule() {
+                try {
+                    // 添加一个随机查询参数来防止浏览器缓存 data.json
+                    const response = await fetch(`data.json?v=${new Date().getTime()}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP 错误！状态: ${response.status}`);
                     }
-                    rowIndex++;
+                    const data = await response.json();
+                    allData = data;
+                    renderTable(data);
+                } catch (e) {
+                    console.error('加载课程数据失败:', e);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.textContent = `加载课程数据失败。请检查 data.json 文件是否存在或格式是否正确。错误详情: ${e.message}`;
+                    errorDiv.style.display = 'block';
+                }
+            }
+
+            function renderTable(data) {
+                if (!data || data.length === 0) {
+                    loadingDiv.style.display = 'none';
+                    errorDiv.textContent = '没有课程数据可显示。';
+                    errorDiv.style.display = 'block';
+                    table.style.display = 'none';
+                    return;
+                }
+
+                // 清空旧内容
+                tableHeader.innerHTML = '';
+                tableBody.innerHTML = '';
+
+                // 创建表头
+                const headers = Object.keys(data[0]);
+                headers.forEach(headerText => {
+                    const th = document.createElement('th');
+                    th.textContent = headerText;
+                    tableHeader.appendChild(th);
                 });
-            });
-        }
-        const today = new Date(); const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-        if (todayUTC >= minDate && todayUTC <= maxDate) { 
-            const todayLine = document.createElement('div'); todayLine.className = 'gantt-today-line';
-            const todayOffset = diffDays(minDate, todayUTC); 
-            todayLine.style.left = `${(todayOffset * dayWidth) + (dayWidth / 2)}px`;
-            todayLine.style.display = 'block';
-            ganttRows.appendChild(todayLine);
-        }
-    }
-    
-    // 页面加载时，首先显示空状态，然后开始自动加载数据
-    renderEmpty();
-    loadAndRenderData();
-});
-</script>
+
+                // 创建表格内容
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    headers.forEach(header => {
+                        const td = document.createElement('td');
+                        td.textContent = row[header] || '';
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                });
+
+                loadingDiv.style.display = 'none';
+                errorDiv.style.display = 'none';
+                table.style.display = 'table';
+            }
+
+            function filterAndSearch() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const selectedDay = dayFilter.value;
+
+                const filteredData = allData.filter(row => {
+                    const matchesDay = !selectedDay || (row['星期'] && row['星期'] === selectedDay);
+                    
+                    const matchesSearch = !searchTerm || Object.values(row).some(value => 
+                        String(value).toLowerCase().includes(searchTerm)
+                    );
+
+                    return matchesDay && matchesSearch;
+                });
+
+                renderTable(filteredData);
+            }
+
+            searchInput.addEventListener('input', filterAndSearch);
+            dayFilter.addEventListener('change', filterAndSearch);
+
+            fetchSchedule();
+        });
+    </script>
 
 </body>
 </html>
