@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>课程表 (V9.0 - 最终正式版)</title>
-    <!-- 引入 SheetJS 库用于解析 Excel 文件 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>课程表</title>
+    <!-- 我们不再需要从CDN加载SheetJS，因为数据处理已在后台完成 -->
     <style>
         :root {
             --primary-color: #3498db; --secondary-color: #2ecc71; --danger-color: #e74c3c;
@@ -55,11 +54,7 @@
         .view-switcher button { background: transparent; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-size: 0.9em; }
         .view-switcher button.active { background-color: var(--primary-color); color: white; }
         .control-panel .spacer { flex-grow: 1; }
-        .control-panel button { padding: 8px 16px; border: none; border-radius: 4px; color: white; font-size: 0.9em; cursor: pointer; transition: background-color 0.2s; }
-        #upload-button { background-color: var(--secondary-color); }
-        #upload-button:hover { background-color: #27ae60; }
-        #file-name { color: #555; font-style: italic; }
-        #error-message { color: var(--danger-color); height: 1em; }
+        #error-message { color: var(--danger-color); height: 1em; margin: 0; }
 
         .filters-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; padding: 15px 25px; border-bottom: 1px solid var(--medium-gray); background-color: #f9fafb; flex-shrink: 0; }
         .filters-container select, .filters-container input[type="date"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
@@ -70,7 +65,7 @@
         .view { display: none; }
         .view.active { display: flex; flex-direction: column; height: 100%; }
 
-        /* --- 甘特图样式 --- */
+        /* --- 甘特图样式 (保持不变) --- */
         #gantt-view.active { display: flex; flex-direction: row; }
         .gantt-chart { display: flex; align-items: flex-start; width: 100%; height: 100%; }
         .gantt-tasks { flex-shrink: 0; width: 260px; border-right: 1px solid var(--medium-gray); background: #fdfdfd; position: sticky; left: 0; z-index: 20; }
@@ -97,33 +92,18 @@
         .gantt-grid-line { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--medium-gray); }
         .gantt-bar { box-sizing: border-box; position: absolute; border-radius: 4px; display: flex; align-items: center; justify-content: center; padding: 0 10px; color: white; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s 0.2s; }
         .gantt-task-item.highlight, .gantt-row.highlight, .gantt-task-group-header.highlight { background-color: var(--highlight-bg) !important; }
-        
-        /* V9.0 交互逻辑重构 */
         .gantt-chart.is-hovering .gantt-bar:not(.is-hovered) { opacity: var(--dim-opacity) !important; }
-        
         .gantt-bar-course { height: 30px; top: 10px; opacity: 0.3; z-index: 1; border: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; padding: 0 5px; }
         .gantt-bar-course-label { font-size: 0.7em; color: #444; font-weight: 600; }
         .gantt-bar-course-text { font-weight: bold; font-size: 0.8em; transition: opacity 0.2s ease-in-out; opacity: 0; color: var(--dark-gray); }
-
         .gantt-bar-session { height: 22px; top: 14px; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .gantt-bar-session::before { content: ''; position: absolute; top: -14px; bottom: -14px; left: 0; right: 0; background: transparent; z-index: 1; }
-
-        /* 当鼠标悬浮在 课时条 上 */
         .gantt-bar-session.is-hovered { transform: scale(1.05); z-index: 16; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
-
-        /* 当鼠标悬浮在 课程背景条 上 */
-        .gantt-bar-course.is-hovered {
-            opacity: 0.9 !important;
-            transform: scale(1.02);
-            z-index: 17; /* 提到最顶层，盖住课时条 */
-            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s; /* 立即提高层级 */
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
+        .gantt-bar-course.is-hovered { opacity: 0.9 !important; transform: scale(1.02); z-index: 17; transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
         .gantt-bar-course.is-hovered .gantt-bar-course-text { opacity: 1; }
-        
         .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--danger-color); z-index: 5; display: none; }
         
-        /* --- 日历视图样式 --- */
+        /* --- 日历视图样式 (保持不变) --- */
         #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
         .calendar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; position: relative; }
         .calendar-header h3 { margin: 0; font-size: 1.5em; }
@@ -160,9 +140,7 @@
             <button id="calendar-view-btn">日历</button>
         </div>
         <div class="spacer"></div>
-        <button id="upload-button">从 Excel 加载数据</button>
-        <input type="file" id="file-input" accept=".xlsx, .xls" style="display: none;">
-        <span id="file-name">尚未选择文件</span>
+        <!-- 我们不再需要上传按钮，但保留错误信息显示区域 -->
         <p id="error-message"></p>
     </div>
     <div class="filters-container">
@@ -190,7 +168,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("正在运行课程表 V9.0 (最终正式版)...");
+    console.log("正在运行课程表 (自动加载版)...");
 
     let allTasks = [];
     const topicColors = {};
@@ -201,9 +179,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentView = 'gantt';
     let currentDisplayDate = new Date();
 
-    const uploadButton = document.getElementById('upload-button');
-    const fileInput = document.getElementById('file-input');
-    const fileNameSpan = document.getElementById('file-name');
     const errorMessage = document.getElementById('error-message');
     
     const ganttView = document.getElementById('gantt-view');
@@ -222,8 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const ganttViewBtn = document.getElementById('gantt-view-btn');
     const calendarViewBtn = document.getElementById('calendar-view-btn');
 
-    uploadButton.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleFile);
+    // 绑定筛选器和视图切换的事件
     filterTeacher.addEventListener('change', applyFilters);
     filterTopic.addEventListener('change', applyFilters);
     filterDateStart.addEventListener('change', applyFilters);
@@ -248,37 +222,89 @@ document.addEventListener('DOMContentLoaded', function() {
         calendarView.classList.toggle('active', view === 'calendar');
         applyFilters();
     }
+    
+    // *** 核心修改：自动加载数据函数 ***
+    function loadAndRenderData() {
+        // 添加一个 cache-busting 参数，防止浏览器缓存旧的 data.json
+        const dataUrl = `data.json?t=${new Date().getTime()}`;
+        
+        errorMessage.textContent = '正在加载课程数据...';
 
-    function handleFile(event) {
-        const file = event.target.files[0]; if (!file) return;
-        fileNameSpan.textContent = file.name; errorMessage.textContent = '';
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        fetch(dataUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`加载数据失败，请检查 data.json 文件是否存在。 (状态: ${response.status})`);
+                }
+                return response.json();
+            })
+            .then(jsonData => {
+                errorMessage.textContent = ''; // 清除加载提示
+                
+                // 使用与之前完全相同的处理逻辑
                 allTasks = processExcelData(jsonData);
-                if (allTasks.length === 0) { throw new Error("Excel 文件中没有找到有效数据。请检查'开课日期'和'结课日期'是否都已填写。"); }
+                
+                if (allTasks.length === 0) {
+                    throw new Error("数据文件为空或格式不正确。请检查 Excel 文件内容。");
+                }
+                
                 collapsedGroups.clear();
                 currentDisplayDate = allTasks.length > 0 ? new Date(allTasks[0].sessionStart + 'T00:00:00') : new Date();
+                
+                // 触发一次重置和渲染
                 resetFiltersButton.click();
-            } catch (err) { errorMessage.textContent = '文件处理失败: ' + err.message; console.error(err); }
-        };
-        reader.readAsArrayBuffer(file);
+            })
+            .catch(err => {
+                errorMessage.textContent = err.message;
+                console.error(err);
+                renderEmpty(); // 显示空状态
+            });
     }
 
+    // 这个函数保持不变，它负责将后台生成的JSON数据转换成程序需要的格式
     function processExcelData(data) {
         const processedTasks = [];
         let currentTeacher = '', currentTopic = '', currentCourseStart = null, currentCourseEnd = null;
+        
+        // Excel 日期解析修正：Excel 存储日期为数字，SheetJS 库会将其转换为JS Date对象。
+        // 如果后台脚本已经处理成 YYYY-MM-DD 字符串，则直接使用。
+        // 如果是 Date 对象，则需要格式化。
+        const formatDateFromData = (dateInput) => {
+            if (!dateInput) return null;
+            // 如果已经是 YYYY-MM-DD 格式的字符串
+            if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+                return dateInput;
+            }
+            // 如果是JS Date对象
+            if (dateInput instanceof Date && !isNaN(dateInput)) {
+                return formatDate(dateInput);
+            }
+            // 如果是Excel的序列号数字（不常见，但作为备用）
+            if (typeof dateInput === 'number') {
+                 const d = new Date(Date.UTC(1900, 0, dateInput - 1));
+                 return formatDate(d);
+            }
+            // 其他情况，尝试直接创建Date对象
+            const d = new Date(dateInput);
+            if (!isNaN(d)) {
+                return formatDate(d);
+            }
+
+            return null;
+        };
+
         data.forEach(row => {
             if (Object.values(row).every(val => val === null || String(val).trim() === '')) return;
             if (row['任课教师'] && String(row['任课教师']).trim() !== '') { currentTeacher = String(row['任课教师']).trim(); currentTopic = ''; currentCourseStart = null; currentCourseEnd = null; }
             if (row['教学主题'] && String(row['教学主题']).trim() !== '') { currentTopic = String(row['教学主题']).trim(); currentCourseStart = null; currentCourseEnd = null; }
-            const rowCourseStart = formatDate(row['开课日期']), rowCourseEnd = formatDate(row['结课日期']);
+            
+            const rowCourseStart = formatDateFromData(row['开课日期']);
+            const rowCourseEnd = formatDateFromData(row['结课日期']);
+            
             if (rowCourseStart && rowCourseEnd) { currentCourseStart = rowCourseStart; currentCourseEnd = rowCourseEnd; }
-            const sessionStart = formatDate(row['起始日期']), sessionEnd = formatDate(row['结束日期']);
+            
+            const sessionStart = formatDateFromData(row['起始日期']);
+            const sessionEnd = formatDateFromData(row['结束日期']);
+            
             if (currentTeacher && currentTopic && currentCourseStart && currentCourseEnd && sessionStart && sessionEnd) {
                 processedTasks.push({ teacher: currentTeacher, topic: currentTopic, session: row['课时'] ? String(row['课时']).trim() : 'N/A', courseStart: currentCourseStart, courseEnd: currentCourseEnd, sessionStart: sessionStart, sessionEnd: sessionEnd });
             }
@@ -286,9 +312,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return processedTasks;
     }
 
+    // 格式化Date对象为 'YYYY-MM-DD'
     function formatDate(date) {
         if (!date || isNaN(new Date(date))) return null;
         const d = new Date(date);
+        // 修正时区问题，确保日期不会因为时区偏移而改变
         const userTimezoneOffset = d.getTimezoneOffset() * 60000;
         const correctedDate = new Date(d.getTime() + userTimezoneOffset);
         const year = correctedDate.getFullYear();
@@ -297,6 +325,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${year}-${month}-${day}`;
     }
 
+    // 以下所有渲染和交互函数 (populateFilterDropdown, applyFilters, 等) 保持原样，无需修改
+    // ... (所有原有的渲染和交互函数) ...
     function populateFilterDropdown(selectElement, options, currentlySelected) {
         const finalSelection = options.includes(currentlySelected) ? currentlySelected : options[0];
         selectElement.innerHTML = options.map(option => `<option value="${option}" ${option === finalSelection ? 'selected' : ''}>${option}</option>`).join('');
@@ -387,9 +417,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderEmpty() {
         if (currentView === 'gantt') {
             ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
-            ganttGrid.innerHTML = '<div class="gantt-empty-state">请先从 Excel 加载数据。</div>';
+            ganttGrid.innerHTML = '<div class="gantt-empty-state">没有课程数据。</div>';
         } else {
-            calendarView.innerHTML = '<div class="gantt-empty-state">请先从 Excel 加载数据。</div>';
+            calendarView.innerHTML = '<div class="gantt-empty-state">没有课程数据。</div>';
         }
     }
 
@@ -457,7 +487,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ganttRows = ganttGrid.querySelector('.gantt-rows');
         const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
         const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-        if (allTasks.length === 0) { ganttRows.innerHTML = '<div class="gantt-empty-state">请先从 Excel 加载数据。</div>'; return; }
+        if (allTasks.length === 0) { ganttRows.innerHTML = '<div class="gantt-empty-state">没有课程数据。</div>'; return; }
         const allDates = allTasks.flatMap(t => t.courseStart && t.courseEnd ? [parseDate(t.courseStart), parseDate(t.courseEnd)] : []).filter(Boolean);
         const minDate = new Date(Math.min(...allDates)); const maxDate = new Date(Math.max(...allDates));
         maxDate.setUTCDate(maxDate.getUTCDate() + 7);
@@ -514,7 +544,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // 页面加载时，首先显示空状态，然后开始自动加载数据
     renderEmpty();
+    loadAndRenderData();
 });
 </script>
 
