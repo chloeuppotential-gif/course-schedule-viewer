@@ -55,6 +55,61 @@
         .control-panel .spacer { flex-grow: 1; }
         #error-message { color: var(--danger-color); height: 1em; margin: 0; padding: 0 10px; }
 
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            padding: 2px;
+            border: 1px solid #ddd;
+            margin-left: 15px;
+        }
+        .zoom-controls button {
+            width: 28px;
+            height: 28px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .zoom-controls button:hover {
+            background-color: #f0f0f0;
+        }
+        .zoom-controls span {
+            margin: 0 8px;
+            font-size: 0.9em;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .navigation-controls {
+            display: flex;
+            align-items: center;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            padding: 2px 5px;
+            border: 1px solid #ddd;
+            margin-left: 15px;
+            gap: 5px;
+        }
+        .navigation-controls button {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .period-selector select {
+            padding: 5px 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background-color: white;
+        }
+
         .filters-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; padding: 15px 25px; border-bottom: 1px solid var(--medium-gray); background-color: #f9fafb; flex-shrink: 0; }
         .filters-container select, .filters-container input[type="date"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
         .filters-container .date-filter-label { font-size: 0.9em; color: #555; }
@@ -142,10 +197,48 @@
             height: 100%;
             top: 0;
             left: 0;
-            background-color: rgba(255, 255, 255, 0.3);
-            border-right: 2px dashed rgba(0, 0, 0, 0.3);
+            background-color: rgba(46, 204, 113, 0.3);
+            border-right: 2px solid rgba(46, 204, 113, 0.8);
             z-index: 3;
         }
+
+        /* 课程状态标签样式 */
+        .task-status {
+            position: absolute;
+            right: 5px;
+            top: 2px;
+            font-size: 0.7em;
+            padding: 2px 4px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+        }
+        .status-not-started {
+            background-color: #95a5a6;
+        }
+        .status-in-progress {
+            background-color: #3498db;
+        }
+        .status-near-end {
+            background-color: #f39c12;
+        }
+        .status-completed {
+            background-color: #2ecc71;
+        }
+        .status-overdue {
+            background-color: #e74c3c;
+        }
+
+        /* 为状态添加图标 */
+        .task-status::before {
+            margin-right: 2px;
+            font-family: sans-serif;
+        }
+        .status-not-started::before { content: "⏳"; }
+        .status-in-progress::before { content: "▶"; }
+        .status-near-end::before { content: "⚠"; }
+        .status-completed::before { content: "✓"; }
+        .status-overdue::before { content: "⚠"; }
 
         /* --- 日历视图样式 --- */
         #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
@@ -192,6 +285,28 @@
             <button id="gantt-view-btn" class="active">甘特图</button>
             <button id="calendar-view-btn">日历</button>
         </div>
+        
+        <!-- 添加缩放控件 -->
+        <div class="zoom-controls">
+            <button id="zoom-out-btn" title="缩小">−</button>
+            <span id="zoom-level">100%</span>
+            <button id="zoom-in-btn" title="放大">+</button>
+        </div>
+        
+        <!-- 添加导航控件 -->
+        <div class="navigation-controls">
+            <button id="nav-today-btn" title="跳转到今天">今天</button>
+            <div class="period-selector">
+                <select id="period-select">
+                    <option value="current-week">本周</option>
+                    <option value="current-month" selected>本月</option>
+                    <option value="next-month">下个月</option>
+                    <option value="current-quarter">本季度</option>
+                    <option value="all">全部</option>
+                </select>
+            </div>
+        </div>
+        
         <div class="spacer"></div>
         <p id="error-message">正在加载数据...</p>
     </div>
@@ -228,7 +343,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let allTasks = [];
     const topicColors = {};
     const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#e84393', '#0984e3', '#6c5ce7', '#00b894'];
-    let dayWidth = 40;
+    
+    // 缩放相关变量
+    let zoomLevel = 100; // 百分比表示
+    const minZoom = 50;  // 最小缩放比例
+    const maxZoom = 200; // 最大缩放比例
+    const zoomStep = 10; // 每次缩放的步长
+    const baseDayWidth = 40; // 基准日宽度
+    let dayWidth = baseDayWidth * (zoomLevel / 100);
+    
     const collapsedGroups = new Set();
 
     let currentView = 'gantt';
@@ -255,6 +378,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const lastUpdatedTimeElement = document.getElementById('last-updated-time');
     const currentTimeElement = document.getElementById('current-time');
     
+    // 缩放和导航控件
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const zoomLevelDisplay = document.getElementById('zoom-level');
+    const navTodayBtn = document.getElementById('nav-today-btn');
+    const periodSelect = document.getElementById('period-select');
+    
     // 更新当前时间显示
     function updateCurrentTime() {
         const now = new Date();
@@ -263,6 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     updateCurrentTime();
 
+    // 事件监听器
     filterTeacher.addEventListener('change', applyFilters);
     filterTopic.addEventListener('change', applyFilters);
     filterDateStart.addEventListener('change', applyFilters);
@@ -278,6 +409,94 @@ document.addEventListener('DOMContentLoaded', function() {
 
     ganttViewBtn.addEventListener('click', () => switchView('gantt'));
     calendarViewBtn.addEventListener('click', () => switchView('calendar'));
+    
+    // 缩放控件事件监听
+    zoomInBtn.addEventListener('click', function() {
+        zoomLevel = Math.min(maxZoom, zoomLevel + zoomStep);
+        updateZoom();
+    });
+    
+    zoomOutBtn.addEventListener('click', function() {
+        zoomLevel = Math.max(minZoom, zoomLevel - zoomStep);
+        updateZoom();
+    });
+    
+    // 导航控件事件监听
+    navTodayBtn.addEventListener('click', function() {
+        currentDisplayDate = new Date();
+        applyFilters();
+    });
+    
+    periodSelect.addEventListener('change', function(e) {
+        const value = e.target.value;
+        const today = new Date();
+        
+        // 重置日期筛选
+        filterDateStart.value = '';
+        filterDateEnd.value = '';
+        
+        switch(value) {
+            case 'current-week': {
+                // 获取本周的开始和结束
+                const first = today.getDate() - today.getDay();
+                const last = first + 6;
+                filterDateStart.value = formatDateForInput(new Date(new Date(today).setDate(first)));
+                filterDateEnd.value = formatDateForInput(new Date(new Date(today).setDate(last)));
+                break;
+            }
+            case 'current-month': {
+                // 获取本月的开始和结束
+                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                filterDateStart.value = formatDateForInput(firstDay);
+                filterDateEnd.value = formatDateForInput(lastDay);
+                break;
+            }
+            case 'next-month': {
+                // 获取下个月的开始和结束
+                const firstDay = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+                const lastDay = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+                filterDateStart.value = formatDateForInput(firstDay);
+                filterDateEnd.value = formatDateForInput(lastDay);
+                break;
+            }
+            case 'current-quarter': {
+                // 获取本季度的开始和结束
+                const quarter = Math.floor(today.getMonth() / 3);
+                const firstMonth = quarter * 3;
+                const firstDay = new Date(today.getFullYear(), firstMonth, 1);
+                const lastDay = new Date(today.getFullYear(), firstMonth + 3, 0);
+                filterDateStart.value = formatDateForInput(firstDay);
+                filterDateEnd.value = formatDateForInput(lastDay);
+                break;
+            }
+            case 'all':
+                // 清空筛选，显示全部
+                filterDateStart.value = '';
+                filterDateEnd.value = '';
+                break;
+        }
+        
+        applyFilters();
+    });
+
+    // 更新缩放函数
+    function updateZoom() {
+        zoomLevelDisplay.textContent = `${zoomLevel}%`;
+        dayWidth = baseDayWidth * (zoomLevel / 100);
+        
+        if (currentView === 'gantt') {
+            applyFilters(); // 重新渲染甘特图
+        }
+    }
+    
+    // 日期格式化工具函数
+    function formatDateForInput(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
 
     function switchView(view) {
         currentView = view;
@@ -286,6 +505,33 @@ document.addEventListener('DOMContentLoaded', function() {
         ganttView.classList.toggle('active', view === 'gantt');
         calendarView.classList.toggle('active', view === 'calendar');
         applyFilters();
+    }
+    
+    // 任务状态判断函数
+    function getTaskStatus(task) {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const sessionStartDate = new Date(task.sessionStart);
+        const sessionEndDate = new Date(task.sessionEnd);
+        
+        // 计算结束日期前7天的日期
+        const nearEndDate = new Date(sessionEndDate);
+        nearEndDate.setDate(nearEndDate.getDate() - 7);
+        
+        // 返回状态对象
+        if (todayStr < task.sessionStart) {
+            return { label: '未开始', class: 'status-not-started' };
+        } else if (todayStr > task.sessionEnd) {
+            return { label: '已完成', class: 'status-completed' };
+        } else if (today > nearEndDate) {
+            return { label: '即将完成', class: 'status-near-end' };
+        } else {
+            // 计算进度百分比
+            const total = sessionEndDate - sessionStartDate;
+            const current = today - sessionStartDate;
+            const percentage = Math.floor((current / total) * 100);
+            return { label: `进行中 ${percentage}%`, class: 'status-in-progress' };
+        }
     }
     
     function loadDataAndInitialize() {
@@ -592,9 +838,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (task.sessionStart && task.sessionEnd) {
                         const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
-                        const sessionBar = document.createElement('div'); sessionBar.className = `gantt-bar gantt-bar-session ${isCollapsed ? 'collapsed' : ''}`; sessionBar.style.top = `${rowIndex * 50}px`; sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; sessionBar.style.width = `${sessionDuration * dayWidth}px`; sessionBar.style.backgroundColor = topicColors[task.topic];
-                        sessionBar.textContent = task.session;
-                        sessionBar.dataset.rowIndex = rowIndex; sessionBar.dataset.groupName = teacher; ganttRows.appendChild(sessionBar); addInteractionListeners(task, sessionBar, false);
+                        const sessionBar = document.createElement('div'); 
+                        sessionBar.className = `gantt-bar gantt-bar-session ${isCollapsed ? 'collapsed' : ''}`;
+                        
+                        // 添加状态标签
+                        const statusInfo = getTaskStatus(task);
+                        sessionBar.innerHTML = `
+                            ${task.session}
+                            <span class="task-status ${statusInfo.class}">${statusInfo.label}</span>
+                        `;
+                        
+                        sessionBar.style.top = `${rowIndex * 50}px`; 
+                        sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; 
+                        sessionBar.style.width = `${sessionDuration * dayWidth}px`; 
+                        sessionBar.style.backgroundColor = topicColors[task.topic];
+                        sessionBar.dataset.rowIndex = rowIndex; 
+                        sessionBar.dataset.groupName = teacher; 
+                        ganttRows.appendChild(sessionBar); 
+                        addInteractionListeners(task, sessionBar, false);
                         
                         // 添加课时进度显示
                         const sessionStartDate = parseDate(task.sessionStart);
@@ -631,6 +892,24 @@ document.addEventListener('DOMContentLoaded', function() {
             todayLine.style.display = 'block';
             ganttRows.appendChild(todayLine);
         }
+        
+        // 自动滚动到今日位置
+        function scrollToToday() {
+            if (todayUTC >= minDate && todayUTC <= maxDate) {
+                const todayOffset = diffDays(minDate, todayUTC);
+                // 计算滚动位置，使今日线位于视图的三分之一处
+                const scrollPos = Math.max(0, (todayOffset * dayWidth) - (ganttGrid.clientWidth / 3));
+                // 平滑滚动到该位置
+                setTimeout(() => {
+                    ganttGrid.scrollTo({
+                        left: scrollPos,
+                        behavior: 'smooth'
+                    });
+                }, 300); // 短暂延迟确保DOM已完全渲染
+            }
+        }
+        // 调用函数
+        scrollToToday();
     }
     
     // 页面加载时，自动执行数据加载和初始化函数
