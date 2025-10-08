@@ -135,17 +135,6 @@
             font-size: 0.75em;
             white-space: nowrap;
         }
-        
-        /* 为进度条添加样式 */
-        .gantt-progress-overlay {
-            position: absolute;
-            height: 100%;
-            top: 0;
-            left: 0;
-            background-color: rgba(255, 255, 255, 0.3);
-            border-right: 2px dashed rgba(0, 0, 0, 0.3);
-            z-index: 3;
-        }
 
         /* --- 日历视图样式 --- */
         #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
@@ -390,48 +379,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
         let title, start, end, duration;
         
-        // 添加进度计算
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        let progress = 0;
-        
         if (isCourseBar) { 
             title = "课程总览"; 
             start = task.courseStart; 
             end = task.courseEnd; 
-            duration = diffDays(parseDate(start), parseDate(end)); 
-            
-            // 课程总体进度
-            const courseStartDate = parseDate(start);
-            const courseEndDate = parseDate(end);
-            const todayDate = parseDate(todayStr);
-            
-            if (todayDate < courseStartDate) {
-                progress = 0;
-            } else if (todayDate > courseEndDate) {
-                progress = 100;
-            } else {
-                progress = Math.round(((todayDate - courseStartDate) / (courseEndDate - courseStartDate)) * 100);
-            }
+            duration = diffDays(parseDate(start), parseDate(end));
         } 
         else { 
             title = `课时: ${task.session}`; 
             start = task.sessionStart; 
             end = task.sessionEnd; 
-            duration = diffDays(parseDate(start), parseDate(end)); 
-            
-            // 课时进度
-            const sessionStartDate = parseDate(start);
-            const sessionEndDate = parseDate(end);
-            const todayDate = parseDate(todayStr);
-            
-            if (todayDate < sessionStartDate) {
-                progress = 0;
-            } else if (todayDate > sessionEndDate) {
-                progress = 100;
-            } else {
-                progress = Math.round(((todayDate - sessionStartDate) / (sessionEndDate - sessionStartDate)) * 100);
-            }
+            duration = diffDays(parseDate(start), parseDate(end));
         }
         
         tooltip.innerHTML = `
@@ -442,7 +400,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div>
             <div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div>
             <div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration} 天</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">进度:</span> <span class="tooltip-value">${progress}%</span></div>
         `;
         
         updateTooltipPosition(event);
@@ -569,51 +526,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
                     courseBar.dataset.rowIndex = rowIndex; courseBar.dataset.groupName = teacher; ganttRows.appendChild(courseBar); addInteractionListeners(task, courseBar, true);
                     
-                    // 添加课程总进度显示
-                    const today = new Date();
-                    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-                    const courseStartDate = parseDate(task.courseStart);
-                    const courseEndDate = parseDate(task.courseEnd);
-                    
-                    if (todayUTC >= courseStartDate && todayUTC <= courseEndDate) {
-                        const progress = (todayUTC - courseStartDate) / (courseEndDate - courseStartDate);
-                        const progressWidth = courseDuration * dayWidth * progress;
-                        
-                        const progressOverlay = document.createElement('div');
-                        progressOverlay.className = 'gantt-progress-overlay';
-                        progressOverlay.style.top = `${rowIndex * 50}px`;
-                        progressOverlay.style.left = `${courseStartOffset * dayWidth}px`;
-                        progressOverlay.style.width = `${progressWidth}px`;
-                        progressOverlay.style.height = '30px';
-                        progressOverlay.dataset.rowIndex = rowIndex;
-                        progressOverlay.dataset.groupName = teacher;
-                        ganttRows.appendChild(progressOverlay);
-                    }
-                    
                     if (task.sessionStart && task.sessionEnd) {
                         const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
                         const sessionBar = document.createElement('div'); sessionBar.className = `gantt-bar gantt-bar-session ${isCollapsed ? 'collapsed' : ''}`; sessionBar.style.top = `${rowIndex * 50}px`; sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; sessionBar.style.width = `${sessionDuration * dayWidth}px`; sessionBar.style.backgroundColor = topicColors[task.topic];
                         sessionBar.textContent = task.session;
                         sessionBar.dataset.rowIndex = rowIndex; sessionBar.dataset.groupName = teacher; ganttRows.appendChild(sessionBar); addInteractionListeners(task, sessionBar, false);
-                        
-                        // 添加课时进度显示
-                        const sessionStartDate = parseDate(task.sessionStart);
-                        const sessionEndDate = parseDate(task.sessionEnd);
-                        
-                        if (todayUTC >= sessionStartDate && todayUTC <= sessionEndDate) {
-                            const progress = (todayUTC - sessionStartDate) / (sessionEndDate - sessionStartDate);
-                            const progressWidth = sessionDuration * dayWidth * progress;
-                            
-                            const progressOverlay = document.createElement('div');
-                            progressOverlay.className = 'gantt-progress-overlay';
-                            progressOverlay.style.top = `${rowIndex * 50}px`;
-                            progressOverlay.style.left = `${sessionStartOffset * dayWidth}px`;
-                            progressOverlay.style.width = `${progressWidth}px`;
-                            progressOverlay.style.height = '22px';
-                            progressOverlay.dataset.rowIndex = rowIndex;
-                            progressOverlay.dataset.groupName = teacher;
-                            ganttRows.appendChild(progressOverlay);
-                        }
                     }
                     rowIndex++;
                 });
