@@ -1,54 +1,38 @@
 name: Generate and Deploy Schedule Data
 
-# 触发条件：
-# 1. 当有代码推送到 main 分支
-# 2. 并且被修改的文件是 schedule.xlsx 或本工作流文件自身
 on:
   push:
     branches:
-      - main # 如果你的主分支是 master，请改成 master
+      - main
     paths:
       - 'schedule.xlsx'
       - '.github/workflows/generate-data.yml'
+  workflow_dispatch: # 增加了这一行，允许我们手动触发
 
 jobs:
   build-and-deploy:
-    # 运行环境：使用最新的Ubuntu系统
     runs-on: ubuntu-latest
-
     steps:
-      # 第1步：检出代码
-      # 把你的仓库代码下载到运行环境中
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 第2步：设置Node.js环境
-      # 安装Node.js，以便我们能运行JS脚本
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18' # 使用Node.js 18版本
-          cache: 'npm' # 缓存npm包，加快后续运行速度
+          node-version: '18'
+          cache: 'npm'
           cache-dependency-path: schedule-generator/package.json
 
-      # 第3步：安装依赖
-      # 进入脚本目录，运行 npm install 安装 xlsx 库
       - name: Install dependencies
         run: npm install
         working-directory: ./schedule-generator
 
-      # 第4步：运行脚本生成 data.json
-      # 执行我们的核心脚本
       - name: Generate data.json from Excel
         run: node process-excel.js
         working-directory: ./schedule-generator
 
-      # 第5步：部署到GitHub Pages
-      # 使用一个成熟的Action，它会自动把 public 文件夹的内容发布到网站上
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          # GITHUB_TOKEN 是GitHub自动提供的密钥，用于授权操作
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # 指定要发布的文件夹是 public
           publish_dir: ./public
