@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>课程表</title>
-    <!-- 添加 Firebase SDK -->
+    <!-- 添加 Firebase SDK (使用CDN方式，适合GitHub Pages) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <style>
@@ -375,15 +375,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("正在运行课程表...");
 
-    // Firebase 初始化 - 替换为您的配置
+    // Firebase 初始化 - 使用您提供的配置
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        apiKey: "AIzaSyDL5vla4WJlGY51fg3ZTODeqnKRxEMUbNU",
+        authDomain: "course-schedule-check.firebaseapp.com",
+        databaseURL: "https://course-schedule-check-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "course-schedule-check",
+        storageBucket: "course-schedule-check.firebasestorage.app",
+        messagingSenderId: "104017045221",
+        appId: "1:104017045221:web:bd2cbb7135a23df514d60c",
+        measurementId: "G-07S6SE764S"
     };
 
     // 初始化 Firebase
