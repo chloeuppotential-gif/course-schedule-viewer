@@ -249,6 +249,22 @@
         .marker-start { background-color: #27ae60; }
         .marker-end { background-color: #c0392b; }
         .marker-single-day { background-color: #3498db; }
+        
+        /* 信息老师专用颜色样式 */
+        .calendar-marker.marker-info-teacher {
+            background-color: #f1c40f; /* 黄色 */
+            color: #333; /* 深色文字 */
+        }
+        
+        .calendar-marker.marker-info-start {
+            background-color: #d35400; /* 深黄/橙色 */
+            color: white;
+        }
+        
+        .calendar-marker.marker-info-end {
+            background-color: #f7dc6f; /* 浅黄色 */
+            color: #333; /* 深色文字 */
+        }
 
         .empty-state { display: flex; justify-content: center; align-items: center; width: 100%; height: 150px; color: #999; }
         .tooltip { position: fixed; background-color: rgba(0, 0, 0, 0.8); color: white; padding: 10px 15px; border-radius: 5px; font-size: 0.9em; z-index: 100; pointer-events: none; opacity: 0; transform: translate(-50%, -100%); transition: opacity 0.1s ease; white-space: nowrap; }
@@ -597,12 +613,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const courseStartDate = new Date(task.courseStart + 'T00:00:00'); 
             const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
             
+            // 检查是否是信息老师
+            const isInfoTeacher = task.teacher.includes('信息老师') || task.teacher === '信息老师';
+            
             if (task.courseStart === task.courseEnd) {
                 if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
                     const dayCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
                     if (dayCell) { 
                         const marker = document.createElement('div'); 
-                        marker.className = 'calendar-marker marker-single-day'; 
+                        
+                        // 如果是信息老师，使用特殊的类和样式
+                        if (isInfoTeacher) {
+                            marker.className = 'calendar-marker marker-info-teacher';
+                        } else {
+                            marker.className = 'calendar-marker marker-single-day';
+                        }
+                        
                         // 添加课时信息到显示文本
                         marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`;
                         addInteractionListeners(task, marker, true); 
@@ -615,7 +641,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
                     if (startCell) { 
                         const marker = document.createElement('div'); 
-                        marker.className = 'calendar-marker marker-start'; 
+                        
+                        // 信息老师的开课使用深黄色
+                        if (isInfoTeacher) {
+                            marker.className = 'calendar-marker marker-info-start';
+                        } else {
+                            marker.className = 'calendar-marker marker-start';
+                        }
+                        
                         // 添加课时信息到开课标记
                         marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`;
                         addInteractionListeners(task, marker, true); 
@@ -627,7 +660,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
                     if (endCell) { 
                         const marker = document.createElement('div'); 
-                        marker.className = 'calendar-marker marker-end'; 
+                        
+                        // 信息老师的结课使用浅黄色
+                        if (isInfoTeacher) {
+                            marker.className = 'calendar-marker marker-info-end';
+                        } else {
+                            marker.className = 'calendar-marker marker-end';
+                        }
+                        
                         // 添加课时信息到结课标记
                         marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`;
                         addInteractionListeners(task, marker, true); 
