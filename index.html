@@ -19,7 +19,7 @@
             
             /* 用户颜色 */
             --user-chloe: #3498db;     /* 蓝色 */
-            --user-cherlene: #f1c40f;  /* 黄色 */
+            --user-charlene: #f1c40f;  /* 黄色 */
             --user-yeung: #2c3e50;     /* 黑色 */
         }
         html, body {
@@ -277,31 +277,44 @@
         /* 多用户选择器和任务检查样式 */
         .user-selector {
             position: absolute;
-            top: -35px; /* 上移至页面顶部 */
+            top: -60px; /* 更上移 */
             right: 15px;
             background: white;
-            padding: 10px;
+            padding: 8px;
             border-radius: 5px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             z-index: 10;
+            font-size: 0.85em; /* 缩小字体 */
         }
         
         .user-option {
             display: flex;
             align-items: center;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
         
         .user-color {
             display: inline-block;
-            width: 16px;
-            height: 16px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            margin-right: 8px;
+            margin-right: 6px;
+        }
+        
+        .user-selector-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        .user-selector-legend {
+            margin-top: 5px;
+            font-size: 0.75em;
+            color: #666;
         }
         
         .user-chloe { background-color: var(--user-chloe); }
-        .user-cherlene { background-color: var(--user-cherlene); }
+        .user-charlene { background-color: var(--user-charlene); }
         .user-yeung { background-color: var(--user-yeung); }
         
         /* 任务复选框样式改进 */
@@ -312,14 +325,14 @@
         }
         
         .checkbox-container {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             position: relative;
         }
         
         .user-checkbox {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             cursor: pointer;
             position: absolute;
             top: 0;
@@ -330,8 +343,8 @@
         }
         
         .checkbox-display {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             border: 1px solid #ccc;
             border-radius: 3px;
             background: white;
@@ -351,9 +364,9 @@
             color: var(--user-chloe);
         }
         
-        .user-checkbox:checked + .checkbox-display.cherlene::before {
+        .user-checkbox:checked + .checkbox-display.charlene::before {
             content: '✓';
-            color: var(--user-cherlene);
+            color: var(--user-charlene);
         }
         
         .user-checkbox:checked + .checkbox-display.yeung::before {
@@ -376,8 +389,8 @@
             background-color: var(--user-chloe);
         }
         
-        .task-feedback.cherlene {
-            background-color: var(--user-cherlene);
+        .task-feedback.charlene {
+            background-color: var(--user-charlene);
             color: black; /* 黄色背景配黑色文字更易读 */
         }
         
@@ -477,10 +490,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     let checkStatus = {};
 
-    // 定义用户 - 更新颜色
+    // 定义用户 - 修改Cherlene为Charlene
     const users = [
         { id: 'chloe', name: 'Chloe', color: '#3498db' },  // 蓝色
-        { id: 'cherlene', name: 'Cherlene', color: '#f1c40f' }, // 黄色
+        { id: 'charlene', name: 'Charlene', color: '#f1c40f' }, // 黄色
         { id: 'yeung', name: 'Mrs. Yeung', color: '#2c3e50' }  // 黑色
     ];
     
@@ -490,16 +503,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // 从 Firebase 加载多用户检查状态
     database.ref('multiUserTaskCheckStatus').on('value', (snapshot) => {
         checkStatus = snapshot.val() || {};
+        console.log("已从Firebase加载状态:", checkStatus);
         // 如果当前在日历视图，重新渲染以更新复选框状态
         if (currentView === 'calendar') {
             applyFilters();
         }
     });
 
-    // 保存检查状态到 Firebase 的函数
+    // 保存检查状态到 Firebase 的函数 - 添加成功回调
     function saveMultiUserCheckStatus(taskId, userId, isChecked) {
+        console.log("正在保存状态:", taskId, userId, isChecked);
         const path = `multiUserTaskCheckStatus/${taskId}/${userId}`;
-        database.ref(path).set(isChecked);
+        database.ref(path).set(isChecked)
+            .then(() => {
+                console.log("状态成功保存");
+            })
+            .catch(error => {
+                console.error("保存状态失败:", error);
+            });
     }
 
     // 显示保存反馈
@@ -746,11 +767,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 在日历标题后添加用户选择器 - 上移位置
+    // 在日历标题后添加用户选择器 - 上移位置并缩小字体
     function addUserSelector(headerElement) {
         const userSelector = document.createElement('div');
         userSelector.className = 'user-selector';
-        userSelector.innerHTML = '<div style="font-weight:bold;margin-bottom:8px;">选择当前用户:</div>';
+        
+        const title = document.createElement('div');
+        title.className = 'user-selector-title';
+        title.textContent = '选择当前用户:';
+        userSelector.appendChild(title);
         
         users.forEach(user => {
             const userOption = document.createElement('div');
@@ -784,10 +809,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 添加说明文字
         const legend = document.createElement('div');
-        legend.style.marginTop = '10px';
-        legend.style.fontSize = '0.8em';
-        legend.style.color = '#666';
-        legend.innerHTML = '勾选框颜色代表不同用户的完成状态';
+        legend.className = 'user-selector-legend';
+        legend.textContent = '勾选颜色代表不同用户的完成状态';
         
         userSelector.appendChild(legend);
         headerElement.appendChild(userSelector);
@@ -884,9 +907,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkboxDisplay.className = `checkbox-display ${user.id}`;
                             
                             checkbox.addEventListener('change', function() {
-                                saveMultiUserCheckStatus(taskId, user.id, checkbox.checked);
+                                const isChecked = checkbox.checked;
+                                saveMultiUserCheckStatus(taskId, user.id, isChecked);
                                 
-                                if (checkbox.checked) {
+                                if (isChecked) {
                                     showFeedback(marker, user.id);
                                 }
                             });
@@ -953,9 +977,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkboxDisplay.className = `checkbox-display ${user.id}`;
                             
                             checkbox.addEventListener('change', function() {
-                                saveMultiUserCheckStatus(taskId, user.id, checkbox.checked);
+                                const isChecked = checkbox.checked;
+                                saveMultiUserCheckStatus(taskId, user.id, isChecked);
                                 
-                                if (checkbox.checked) {
+                                if (isChecked) {
                                     showFeedback(marker, user.id);
                                 }
                             });
@@ -1021,9 +1046,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkboxDisplay.className = `checkbox-display ${user.id}`;
                             
                             checkbox.addEventListener('change', function() {
-                                saveMultiUserCheckStatus(taskId, user.id, checkbox.checked);
+                                const isChecked = checkbox.checked;
+                                saveMultiUserCheckStatus(taskId, user.id, isChecked);
                                 
-                                if (checkbox.checked) {
+                                if (isChecked) {
                                     showFeedback(marker, user.id);
                                 }
                             });
