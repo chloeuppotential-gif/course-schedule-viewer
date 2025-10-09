@@ -269,23 +269,82 @@
             color: #333; /* 深色文字，提高可读性 */
         }
 
-        /* 任务检查相关样式 */
-        .task-checkbox {
-            margin-right: 5px;
-            cursor: pointer;
-            width: 14px;
-            height: 14px;
+        /* 多用户选择器和任务检查样式 */
+        .user-selector {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10;
         }
-
-        .calendar-marker.checked {
-            opacity: 0.7;
-            text-decoration: line-through;
-        }
-
-        .calendar-marker {
+        
+        .user-option {
             display: flex;
             align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .user-color {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .user-chloe { background-color: #3498db; }
+        .user-cherlene { background-color: #f1c40f; }
+        .user-yeung { background-color: #e74c3c; }
+        
+        /* 任务复选框样式 */
+        .multi-checkbox {
+            display: flex;
+            gap: 3px;
+            margin-right: 5px;
+        }
+        
+        .user-checkbox {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
             position: relative;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            appearance: none;
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .user-checkbox:checked::before {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: white;
+            font-size: 12px;
+        }
+        
+        .user-checkbox.user-chloe { background-color: #3498db; }
+        .user-checkbox.user-cherlene { background-color: #f1c40f; }
+        .user-checkbox.user-yeung { background-color: #e74c3c; }
+        
+        .user-checkbox.user-chloe:not(:checked) { background-color: transparent; }
+        .user-checkbox.user-cherlene:not(:checked) { background-color: transparent; }
+        .user-checkbox.user-yeung:not(:checked) { background-color: transparent; }
+        
+        .calendar-marker.checked-chloe {
+            border-left: 4px solid #3498db;
+        }
+        
+        .calendar-marker.checked-cherlene {
+            border-left: 4px solid #f1c40f;
+        }
+        
+        .calendar-marker.checked-yeung {
+            border-left: 4px solid #e74c3c;
         }
 
         .task-feedback {
@@ -375,7 +434,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("正在运行课程表...");
 
-    // Firebase 初始化 - 使用您提供的配置
+    // Firebase 初始化
     const firebaseConfig = {
         apiKey: "AIzaSyDL5vla4WJlGY51fg3ZTODeqnKRxEMUbNU",
         authDomain: "course-schedule-check.firebaseapp.com",
@@ -392,8 +451,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     let checkStatus = {};
 
-    // 从 Firebase 加载检查状态
-    database.ref('taskCheckStatus').on('value', (snapshot) => {
+    // 定义用户
+    const users = [
+        { id: 'chloe', name: 'Chloe', color: '#3498db' },
+        { id: 'cherlene', name: 'Cherlene', color: '#f1c40f' },
+        { id: 'yeung', name: 'Mrs. Yeung', color: '#e74c3c' }
+    ];
+    
+    // 当前选择的用户
+    let currentUser = users[0].id;
+
+    // 从 Firebase 加载多用户检查状态
+    database.ref('multiUserTaskCheckStatus').on('value', (snapshot) => {
         checkStatus = snapshot.val() || {};
         // 如果当前在日历视图，重新渲染以更新复选框状态
         if (currentView === 'calendar') {
@@ -402,8 +471,28 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 保存检查状态到 Firebase 的函数
-    function saveCheckStatus(taskId, isChecked) {
-        database.ref('taskCheckStatus/' + taskId).set(isChecked);
+    function saveMultiUserCheckStatus(taskId, userId, isChecked) {
+        const path = `multiUserTaskCheckStatus/${taskId}/${userId}`;
+        database.ref(path).set(isChecked);
+    }
+
+    // 显示保存反馈
+    function showFeedback(element, userId) {
+        const feedback = document.createElement('div');
+        feedback.className = 'task-feedback';
+        
+        // 根据用户ID选择颜色
+        const user = users.find(u => u.id === userId);
+        if (user) {
+            feedback.style.backgroundColor = user.color;
+        }
+        
+        feedback.textContent = '✓ 已保存';
+        element.appendChild(feedback);
+        
+        setTimeout(() => {
+            feedback.remove();
+        }, 1500);
     }
 
     let allTasks = [];
@@ -638,6 +727,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 在日历标题后添加用户选择器
+    function addUserSelector(headerElement) {
+        const userSelector = document.createElement('div');
+        userSelector.className = 'user-selector';
+        userSelector.innerHTML = '<div style="font-weight:bold;margin-bottom:8px;">选择当前用户:</div>';
+        
+        users.forEach(user => {
+            const userOption = document.createElement('div');
+            userOption.className = 'user-option';
+            
+            const colorBox = document.createElement('span');
+            colorBox.className = `user-color user-${user.id}`;
+            colorBox.style.backgroundColor = user.color;
+            
+            const radioBtn = document.createElement('input');
+            radioBtn.type = 'radio';
+            radioBtn.name = 'current-user';
+            radioBtn.value = user.id;
+            radioBtn.id = `user-${user.id}`;
+            radioBtn.checked = currentUser === user.id;
+            radioBtn.style.marginRight = '5px';
+            
+            radioBtn.addEventListener('change', function() {
+                currentUser = this.value;
+            });
+            
+            const label = document.createElement('label');
+            label.htmlFor = `user-${user.id}`;
+            label.textContent = user.name;
+            
+            userOption.appendChild(radioBtn);
+            userOption.appendChild(colorBox);
+            userOption.appendChild(label);
+            userSelector.appendChild(userOption);
+        });
+        
+        // 添加说明文字
+        const legend = document.createElement('div');
+        legend.style.marginTop = '10px';
+        legend.style.fontSize = '0.8em';
+        legend.style.color = '#666';
+        legend.innerHTML = '勾选框颜色代表不同用户的完成状态';
+        
+        userSelector.appendChild(legend);
+        headerElement.appendChild(userSelector);
+    }
+
     function renderCalendar(tasksToRender) {
         calendarView.innerHTML = '';
         const header = document.createElement('div'); header.className = 'calendar-header';
@@ -651,6 +787,10 @@ document.addEventListener('DOMContentLoaded', function() {
         nextBtn.onclick = () => { currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1); applyFilters(); };
         const title = document.createElement('h3'); title.textContent = `${currentDisplayDate.getFullYear()}年 ${currentDisplayDate.getMonth() + 1}月`;
         header.append(nav, title);
+        
+        // 添加用户选择器
+        addUserSelector(header);
+        
         const gridContainer = document.createElement('div'); gridContainer.className = 'calendar-grid-container';
         const weekdays = document.createElement('div'); weekdays.className = 'calendar-weekdays';
         ['日', '一', '二', '三', '四', '五', '六'].forEach(day => { const dayEl = document.createElement('div'); dayEl.textContent = day; weekdays.appendChild(dayEl); });
@@ -698,35 +838,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.className = 'calendar-marker marker-single-day';
                         }
                         
-                        // 检查是否已完成
-                        const isChecked = checkStatus[taskId] || false;
-                        if (isChecked) {
-                            marker.classList.add('checked');
-                        }
+                        // 获取此任务的所有用户勾选状态
+                        const taskChecks = checkStatus[taskId] || {};
                         
-                        // 创建复选框容器
-                        const checkContainer = document.createElement('div');
-                        checkContainer.style.display = 'flex';
-                        checkContainer.style.alignItems = 'center';
-                        checkContainer.style.marginRight = '5px';
-                        
-                        // 创建复选框
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.className = 'task-checkbox';
-                        checkbox.checked = isChecked;
-                        checkbox.addEventListener('change', function() {
-                            saveCheckStatus(taskId, checkbox.checked);
-                            if (checkbox.checked) {
-                                marker.classList.add('checked');
-                                // 添加反馈
-                                showFeedback(marker);
-                            } else {
-                                marker.classList.remove('checked');
+                        // 根据用户勾选状态添加类
+                        users.forEach(user => {
+                            if (taskChecks[user.id]) {
+                                marker.classList.add(`checked-${user.id}`);
                             }
                         });
                         
-                        checkContainer.appendChild(checkbox);
+                        // 创建多用户复选框容器
+                        const checkContainer = document.createElement('div');
+                        checkContainer.className = 'multi-checkbox';
+                        
+                        // 为每个用户创建复选框
+                        users.forEach(user => {
+                            const isChecked = taskChecks[user.id] || false;
+                            
+                            // 创建复选框
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.className = `user-checkbox user-${user.id}`;
+                            checkbox.dataset.userId = user.id;
+                            checkbox.checked = isChecked;
+                            checkbox.style.backgroundColor = isChecked ? user.color : 'transparent';
+                            checkbox.addEventListener('change', function() {
+                                saveMultiUserCheckStatus(taskId, user.id, checkbox.checked);
+                                
+                                if (checkbox.checked) {
+                                    marker.classList.add(`checked-${user.id}`);
+                                    showFeedback(marker, user.id);
+                                } else {
+                                    marker.classList.remove(`checked-${user.id}`);
+                                }
+                            });
+                            
+                            checkContainer.appendChild(checkbox);
+                        });
                         
                         // 添加到标记开始
                         marker.prepend(checkContainer);
@@ -758,35 +907,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.className = 'calendar-marker marker-start';
                         }
                         
-                        // 检查是否已完成
-                        const isChecked = checkStatus[taskId] || false;
-                        if (isChecked) {
-                            marker.classList.add('checked');
-                        }
+                        // 获取此任务的所有用户勾选状态
+                        const taskChecks = checkStatus[taskId] || {};
                         
-                        // 创建复选框容器
-                        const checkContainer = document.createElement('div');
-                        checkContainer.style.display = 'flex';
-                        checkContainer.style.alignItems = 'center';
-                        checkContainer.style.marginRight = '5px';
-                        
-                        // 创建复选框
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.className = 'task-checkbox';
-                        checkbox.checked = isChecked;
-                        checkbox.addEventListener('change', function() {
-                            saveCheckStatus(taskId, checkbox.checked);
-                            if (checkbox.checked) {
-                                marker.classList.add('checked');
-                                // 添加反馈
-                                showFeedback(marker);
-                            } else {
-                                marker.classList.remove('checked');
+                        // 根据用户勾选状态添加类
+                        users.forEach(user => {
+                            if (taskChecks[user.id]) {
+                                marker.classList.add(`checked-${user.id}`);
                             }
                         });
                         
-                        checkContainer.appendChild(checkbox);
+                        // 创建多用户复选框容器
+                        const checkContainer = document.createElement('div');
+                        checkContainer.className = 'multi-checkbox';
+                        
+                        // 为每个用户创建复选框
+                        users.forEach(user => {
+                            const isChecked = taskChecks[user.id] || false;
+                            
+                            // 创建复选框
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.className = `user-checkbox user-${user.id}`;
+                            checkbox.dataset.userId = user.id;
+                            checkbox.checked = isChecked;
+                            checkbox.style.backgroundColor = isChecked ? user.color : 'transparent';
+                            checkbox.addEventListener('change', function() {
+                                saveMultiUserCheckStatus(taskId, user.id, checkbox.checked);
+                                
+                                if (checkbox.checked) {
+                                    marker.classList.add(`checked-${user.id}`);
+                                    showFeedback(marker, user.id);
+                                } else {
+                                    marker.classList.remove(`checked-${user.id}`);
+                                }
+                            });
+                            
+                            checkContainer.appendChild(checkbox);
+                        });
                         
                         // 添加到标记开始
                         marker.prepend(checkContainer);
@@ -817,35 +975,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.className = 'calendar-marker marker-end';
                         }
                         
-                        // 检查是否已完成
-                        const isChecked = checkStatus[taskId] || false;
-                        if (isChecked) {
-                            marker.classList.add('checked');
-                        }
+                        // 获取此任务的所有用户勾选状态
+                        const taskChecks = checkStatus[taskId] || {};
                         
-                        // 创建复选框容器
-                        const checkContainer = document.createElement('div');
-                        checkContainer.style.display = 'flex';
-                        checkContainer.style.alignItems = 'center';
-                        checkContainer.style.marginRight = '5px';
-                        
-                        // 创建复选框
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.className = 'task-checkbox';
-                        checkbox.checked = isChecked;
-                        checkbox.addEventListener('change', function() {
-                            saveCheckStatus(taskId, checkbox.checked);
-                            if (checkbox.checked) {
-                                marker.classList.add('checked');
-                                // 添加反馈
-                                showFeedback(marker);
-                            } else {
-                                marker.classList.remove('checked');
+                        // 根据用户勾选状态添加类
+                        users.forEach(user => {
+                            if (taskChecks[user.id]) {
+                                marker.classList.add(`checked-${user.id}`);
                             }
                         });
                         
-                        checkContainer.appendChild(checkbox);
+                        // 创建多用户复选框容器
+                        const checkContainer = document.createElement('div');
+                        checkContainer.className = 'multi-checkbox';
+                        
+                        // 为每个用户创建复选框
+                        users.forEach(user => {
+                            const isChecked = taskChecks[user.id] || false;
+                            
+                            // 创建复选框
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.className = `user-checkbox user-${user.id}`;
+                            checkbox.dataset.userId = user.id;
+                            checkbox.checked = isChecked;
+                            checkbox.style.backgroundColor = isChecked ? user.color : 'transparent';
+                            checkbox.addEventListener('change', function() {
+                                saveMultiUserCheckStatus(taskId, user.id, checkbox.checked);
+                                
+                                if (checkbox.checked) {
+                                    marker.classList.add(`checked-${user.id}`);
+                                    showFeedback(marker, user.id);
+                                } else {
+                                    marker.classList.remove(`checked-${user.id}`);
+                                }
+                            });
+                            
+                            checkContainer.appendChild(checkbox);
+                        });
                         
                         // 添加到标记开始
                         marker.prepend(checkContainer);
@@ -862,18 +1029,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         gridContainer.append(weekdays, grid); calendarView.append(header, gridContainer);
-    }
-    
-    // 显示保存反馈
-    function showFeedback(element) {
-        const feedback = document.createElement('div');
-        feedback.className = 'task-feedback';
-        feedback.textContent = '✓ 已保存';
-        element.appendChild(feedback);
-        
-        setTimeout(() => {
-            feedback.remove();
-        }, 1500);
     }
 
     function renderGantt(tasksToRender) {
