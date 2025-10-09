@@ -79,10 +79,51 @@
         .gantt-grid { position: relative; display: flex; flex-direction: column; flex-grow: 1; }
         .gantt-timeline { position: sticky; top: 0; z-index: 10; background: var(--bg-color); }
         .gantt-months, .gantt-days { display: flex; }
-        .gantt-month, .gantt-day { flex-shrink: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--medium-gray); border-bottom: 1px solid var(--medium-gray); font-weight: bold; }
-        .gantt-month { height: 40px; font-size: 0.8em; }
-        .gantt-day { height: 40px; width: 40px; font-size: 0.75em; }
-        .gantt-rows { position: relative; }
+        
+        /* 修改日期单元格样式，增强边框 */
+        .gantt-month { 
+            height: 40px; 
+            font-size: 0.8em; 
+            flex-shrink: 0; 
+            box-sizing: border-box; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border-right: 1px solid var(--medium-gray); 
+            border-bottom: 1px solid var(--medium-gray); 
+            font-weight: bold; 
+        }
+        
+        .gantt-day { 
+            height: 40px; 
+            width: 40px; 
+            font-size: 0.75em; 
+            flex-shrink: 0; 
+            box-sizing: border-box; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border-right: 1px solid var(--medium-gray); 
+            border-bottom: 1px solid var(--medium-gray); 
+            font-weight: bold; 
+            position: relative;
+            background-color: #fdfdfd;
+        }
+        
+        /* 添加左边框给第一个日期单元格 */
+        .gantt-days .gantt-day:first-child {
+            border-left: 1px solid var(--medium-gray);
+        }
+        
+        /* 甘特图行区域显示网格背景 */
+        .gantt-rows { 
+            position: relative;
+            background-color: white;
+            background-image: 
+                linear-gradient(to right, var(--medium-gray) 1px, transparent 1px);
+            background-size: 40px 100%;
+            background-position: 0 0;
+        }
         
         /* 修改折叠样式，改为完全不占用空间 */
         .gantt-row { 
@@ -91,9 +132,13 @@
             border-bottom: 1px solid #f0f0f0; 
             overflow: hidden;
             position: relative;
-            background: var(--bg-color);
+            background: transparent; /* 改为透明背景以显示网格线 */
         }
-        .gantt-row.group-header-row { background-color: var(--header-bg); border-bottom: 1px solid var(--medium-gray); }
+        
+        .gantt-row.group-header-row { 
+            background-color: var(--header-bg); 
+            border-bottom: 1px solid var(--medium-gray); 
+        }
         
         /* 重要：使用display:none完全移出布局流 */
         .gantt-row.collapsed, 
@@ -102,6 +147,7 @@
             display: none !important;
         }
 
+        /* 改进网格线样式，提高可见性 */
         .gantt-grid-lines { 
             position: absolute; 
             top: 0; 
@@ -111,12 +157,16 @@
             z-index: 0; 
             pointer-events: none; 
         }
+        
         .gantt-grid-line { 
             position: absolute; 
             top: 0; 
             bottom: 0; 
+            width: 0; /* 确保线条宽度为0，只显示边框 */
             border-left: 1px dashed var(--medium-gray); 
             z-index: 1;
+            opacity: 1; /* 确保不透明 */
+            pointer-events: none;
         }
         
         .gantt-bar { 
@@ -610,14 +660,38 @@ document.addEventListener('DOMContentLoaded', function() {
         ganttRows.appendChild(ganttGridLines);
         
         let currentDate = new Date(minDate); let months = {}; let dayIndex = 0;
+        
+        // 改进的日期和网格线渲染
         while (currentDate <= maxDate) {
-            const dayEl = document.createElement('div'); dayEl.className = 'gantt-day'; dayEl.textContent = currentDate.getUTCDate(); ganttDays.appendChild(dayEl);
-            const lineEl = document.createElement('div'); lineEl.className = 'gantt-grid-line'; lineEl.style.left = `${(dayIndex + 1) * dayWidth}px`;
+            const dayEl = document.createElement('div'); 
+            dayEl.className = 'gantt-day'; 
+            dayEl.textContent = currentDate.getUTCDate(); 
+            ganttDays.appendChild(dayEl);
+            
+            // 创建垂直网格线 - 修正位置
+            const lineEl = document.createElement('div'); 
+            lineEl.className = 'gantt-grid-line'; 
+            lineEl.style.left = `${dayIndex * dayWidth}px`; // 从0开始，每个单元格左侧
             ganttGridLines.appendChild(lineEl);
+            
             const monthKey = `${currentDate.getUTCFullYear()}-${currentDate.getUTCMonth()}`;
-            if (!months[monthKey]) { months[monthKey] = { name: `${currentDate.getUTCFullYear()}年 ${currentDate.getUTCMonth() + 1}月`, days: 0 }; }
-            months[monthKey].days++; currentDate.setUTCDate(currentDate.getUTCDate() + 1); dayIndex++;
+            if (!months[monthKey]) { 
+                months[monthKey] = { 
+                    name: `${currentDate.getUTCFullYear()}年 ${currentDate.getUTCMonth() + 1}月`, 
+                    days: 0 
+                }; 
+            }
+            
+            months[monthKey].days++; 
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1); 
+            dayIndex++;
         }
+        
+        // 添加最后一条网格线
+        const finalLineEl = document.createElement('div');
+        finalLineEl.className = 'gantt-grid-line';
+        finalLineEl.style.left = `${dayIndex * dayWidth}px`;
+        ganttGridLines.appendChild(finalLineEl);
         
         for (const key in months) { 
             const month = months[key]; 
@@ -771,6 +845,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
+        
+        // 添加SVG网格增强（可选）
+        addSVGGrid(ganttRows, (diffDays(minDate, maxDate) + 1) * dayWidth, displayRowIndex * 50);
+    }
+    
+    // 添加SVG网格增强
+    function addSVGGrid(container, width, height) {
+        // 检查是否已经存在SVG网格
+        const existingSvg = container.querySelector('.grid-svg');
+        if (existingSvg) {
+            existingSvg.remove();
+        }
+        
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", "grid-svg");
+        svg.setAttribute("width", width);
+        svg.setAttribute("height", height);
+        svg.style.position = "absolute";
+        svg.style.top = "0";
+        svg.style.left = "0";
+        svg.style.pointerEvents = "none";
+        svg.style.zIndex = "0";
+        
+        // 创建垂直网格线
+        for (let x = 0; x <= width; x += dayWidth) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x);
+            line.setAttribute("y1", 0);
+            line.setAttribute("x2", x);
+            line.setAttribute("y2", height);
+            line.setAttribute("stroke", "#e0e0e0");
+            line.setAttribute("stroke-width", "1");
+            line.setAttribute("stroke-dasharray", "2,2");
+            svg.appendChild(line);
+        }
+        
+        // 创建水平网格线
+        for (let y = 0; y <= height; y += 50) { // 50px为每行高度
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", 0);
+            line.setAttribute("y1", y);
+            line.setAttribute("x2", width);
+            line.setAttribute("y2", y);
+            line.setAttribute("stroke", "#f0f0f0");
+            line.setAttribute("stroke-width", "1");
+            svg.appendChild(line);
+        }
+        
+        container.appendChild(svg);
     }
     
     // 页面加载时，自动执行数据加载和初始化函数
