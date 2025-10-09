@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>课程表</title>
+    <!-- 添加 Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <style>
         :root {
             --primary-color: #3498db; --secondary-color: #2ecc71; --danger-color: #e74c3c;
@@ -266,6 +269,37 @@
             color: #333; /* 深色文字，提高可读性 */
         }
 
+        /* 任务检查相关样式 */
+        .task-checkbox {
+            margin-right: 5px;
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+        }
+
+        .calendar-marker.checked {
+            opacity: 0.7;
+            text-decoration: line-through;
+        }
+
+        .calendar-marker {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .task-feedback {
+            position: absolute;
+            background-color: rgba(39, 174, 96, 0.8);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            z-index: 100;
+            top: -5px;
+            right: 5px;
+        }
+
         .empty-state { display: flex; justify-content: center; align-items: center; width: 100%; height: 150px; color: #999; }
         .tooltip { position: fixed; background-color: rgba(0, 0, 0, 0.8); color: white; padding: 10px 15px; border-radius: 5px; font-size: 0.9em; z-index: 100; pointer-events: none; opacity: 0; transform: translate(-50%, -100%); transition: opacity 0.1s ease; white-space: nowrap; }
         .tooltip.visible { opacity: 1; }
@@ -340,6 +374,36 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log("正在运行课程表...");
+
+    // Firebase 初始化 - 替换为您的配置
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    // 初始化 Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    let checkStatus = {};
+
+    // 从 Firebase 加载检查状态
+    database.ref('taskCheckStatus').on('value', (snapshot) => {
+        checkStatus = snapshot.val() || {};
+        // 如果当前在日历视图，重新渲染以更新复选框状态
+        if (currentView === 'calendar') {
+            applyFilters();
+        }
+    });
+
+    // 保存检查状态到 Firebase 的函数
+    function saveCheckStatus(taskId, isChecked) {
+        database.ref('taskCheckStatus/' + taskId).set(isChecked);
+    }
 
     let allTasks = [];
     const topicColors = {};
@@ -622,6 +686,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (dayCell) { 
                         const marker = document.createElement('div'); 
                         
+                        // 创建唯一任务 ID
+                        const taskId = `task-${task.teacher}-${task.topic}-${task.session}-single-${task.courseStart}`;
+                        marker.dataset.taskId = taskId;
+                        
                         // 如果是信息老师，使用特殊的类和样式
                         if (isInfoTeacher) {
                             marker.className = 'calendar-marker marker-info-teacher';
@@ -629,8 +697,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.className = 'calendar-marker marker-single-day';
                         }
                         
-                        // 添加课时信息到显示文本
-                        marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`;
+                        // 检查是否已完成
+                        const isChecked = checkStatus[taskId] || false;
+                        if (isChecked) {
+                            marker.classList.add('checked');
+                        }
+                        
+                        // 创建复选框容器
+                        const checkContainer = document.createElement('div');
+                        checkContainer.style.display = 'flex';
+                        checkContainer.style.alignItems = 'center';
+                        checkContainer.style.marginRight = '5px';
+                        
+                        // 创建复选框
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'task-checkbox';
+                        checkbox.checked = isChecked;
+                        checkbox.addEventListener('change', function() {
+                            saveCheckStatus(taskId, checkbox.checked);
+                            if (checkbox.checked) {
+                                marker.classList.add('checked');
+                                // 添加反馈
+                                showFeedback(marker);
+                            } else {
+                                marker.classList.remove('checked');
+                            }
+                        });
+                        
+                        checkContainer.appendChild(checkbox);
+                        
+                        // 添加到标记开始
+                        marker.prepend(checkContainer);
+                        
+                        // 添加课时信息
+                        marker.appendChild(document.createTextNode(
+                            `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`
+                        ));
+                        
                         addInteractionListeners(task, marker, true); 
                         dayCell.appendChild(marker);
                     }
@@ -642,6 +746,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (startCell) { 
                         const marker = document.createElement('div'); 
                         
+                        // 创建唯一任务 ID
+                        const taskId = `task-${task.teacher}-${task.topic}-${task.session}-start-${task.courseStart}`;
+                        marker.dataset.taskId = taskId;
+                        
                         // 信息老师的开课使用深紫色
                         if (isInfoTeacher) {
                             marker.className = 'calendar-marker marker-info-start';
@@ -649,8 +757,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.className = 'calendar-marker marker-start';
                         }
                         
+                        // 检查是否已完成
+                        const isChecked = checkStatus[taskId] || false;
+                        if (isChecked) {
+                            marker.classList.add('checked');
+                        }
+                        
+                        // 创建复选框容器
+                        const checkContainer = document.createElement('div');
+                        checkContainer.style.display = 'flex';
+                        checkContainer.style.alignItems = 'center';
+                        checkContainer.style.marginRight = '5px';
+                        
+                        // 创建复选框
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'task-checkbox';
+                        checkbox.checked = isChecked;
+                        checkbox.addEventListener('change', function() {
+                            saveCheckStatus(taskId, checkbox.checked);
+                            if (checkbox.checked) {
+                                marker.classList.add('checked');
+                                // 添加反馈
+                                showFeedback(marker);
+                            } else {
+                                marker.classList.remove('checked');
+                            }
+                        });
+                        
+                        checkContainer.appendChild(checkbox);
+                        
+                        // 添加到标记开始
+                        marker.prepend(checkContainer);
+                        
                         // 添加课时信息到开课标记
-                        marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`;
+                        marker.appendChild(document.createTextNode(
+                            `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`
+                        ));
+                        
                         addInteractionListeners(task, marker, true); 
                         startCell.appendChild(marker);
                     }
@@ -661,6 +805,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (endCell) { 
                         const marker = document.createElement('div'); 
                         
+                        // 创建唯一任务 ID
+                        const taskId = `task-${task.teacher}-${task.topic}-${task.session}-end-${task.courseEnd}`;
+                        marker.dataset.taskId = taskId;
+                        
                         // 信息老师的结课使用浅紫色
                         if (isInfoTeacher) {
                             marker.className = 'calendar-marker marker-info-end';
@@ -668,8 +816,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.className = 'calendar-marker marker-end';
                         }
                         
+                        // 检查是否已完成
+                        const isChecked = checkStatus[taskId] || false;
+                        if (isChecked) {
+                            marker.classList.add('checked');
+                        }
+                        
+                        // 创建复选框容器
+                        const checkContainer = document.createElement('div');
+                        checkContainer.style.display = 'flex';
+                        checkContainer.style.alignItems = 'center';
+                        checkContainer.style.marginRight = '5px';
+                        
+                        // 创建复选框
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'task-checkbox';
+                        checkbox.checked = isChecked;
+                        checkbox.addEventListener('change', function() {
+                            saveCheckStatus(taskId, checkbox.checked);
+                            if (checkbox.checked) {
+                                marker.classList.add('checked');
+                                // 添加反馈
+                                showFeedback(marker);
+                            } else {
+                                marker.classList.remove('checked');
+                            }
+                        });
+                        
+                        checkContainer.appendChild(checkbox);
+                        
+                        // 添加到标记开始
+                        marker.prepend(checkContainer);
+                        
                         // 添加课时信息到结课标记
-                        marker.textContent = `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`;
+                        marker.appendChild(document.createTextNode(
+                            `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`
+                        ));
+                        
                         addInteractionListeners(task, marker, true); 
                         endCell.appendChild(marker);
                     }
@@ -677,6 +861,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         gridContainer.append(weekdays, grid); calendarView.append(header, gridContainer);
+    }
+    
+    // 显示保存反馈
+    function showFeedback(element) {
+        const feedback = document.createElement('div');
+        feedback.className = 'task-feedback';
+        feedback.textContent = '✓ 已保存';
+        element.appendChild(feedback);
+        
+        setTimeout(() => {
+            feedback.remove();
+        }, 1500);
     }
 
     function renderGantt(tasksToRender) {
