@@ -241,7 +241,7 @@
 
         /* --- 日历视图样式 --- */
         #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
-        .calendar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; position: relative; }
+        .calendar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; position: relative; min-height: 70px; }
         .calendar-header h3 { margin: 0; font-size: 1.5em; }
         .calendar-nav { position: absolute; left: 0; display: flex; gap: 10px; }
         .calendar-nav button { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; cursor: pointer; }
@@ -276,15 +276,16 @@
 
         /* 多用户选择器和任务检查样式 */
         .user-selector {
-            position: absolute;
-            top: -60px; /* 更上移 */
-            right: 15px;
+            position: fixed;
+            top: 75px; 
+            right: 20px;
             background: white;
             padding: 8px;
             border-radius: 5px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            z-index: 10;
-            font-size: 0.85em; /* 缩小字体 */
+            z-index: 1000;
+            font-size: 0.8em; /* 更小的字体 */
+            max-width: 200px;
         }
         
         .user-option {
@@ -304,7 +305,7 @@
         .user-selector-title {
             font-weight: bold;
             margin-bottom: 5px;
-            font-size: 0.9em;
+            font-size: 0.85em;
         }
         
         .user-selector-legend {
@@ -321,18 +322,18 @@
         .multi-checkbox {
             display: flex;
             gap: 2px;
-            margin-right: 5px;
+            margin-right: 4px;
         }
         
         .checkbox-container {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             position: relative;
         }
         
         .user-checkbox {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             cursor: pointer;
             position: absolute;
             top: 0;
@@ -343,8 +344,8 @@
         }
         
         .checkbox-display {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border: 1px solid #ccc;
             border-radius: 3px;
             background: white;
@@ -354,7 +355,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             z-index: 1;
         }
@@ -490,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     let checkStatus = {};
 
-    // 定义用户 - 修改Cherlene为Charlene
+    // 定义用户
     const users = [
         { id: 'chloe', name: 'Chloe', color: '#3498db' },  // 蓝色
         { id: 'charlene', name: 'Charlene', color: '#f1c40f' }, // 黄色
@@ -500,26 +501,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // 当前选择的用户
     let currentUser = users[0].id;
 
-    // 从 Firebase 加载多用户检查状态
-    database.ref('multiUserTaskCheckStatus').on('value', (snapshot) => {
-        checkStatus = snapshot.val() || {};
-        console.log("已从Firebase加载状态:", checkStatus);
-        // 如果当前在日历视图，重新渲染以更新复选框状态
-        if (currentView === 'calendar') {
-            applyFilters();
-        }
+    // 从 Firebase 加载检查状态 - 改为直接使用 taskCheckStatus 路径
+    database.ref('taskCheckStatus').on('value', (snapshot) => {
+        console.log("正在加载旧版检查状态...");
+        const oldData = snapshot.val() || {};
+        
+        // 从 Firebase 加载多用户检查状态
+        database.ref('taskCheckStatus').once('value', (snapshot) => {
+            checkStatus = snapshot.val() || {};
+            console.log("已从Firebase加载状态:", checkStatus);
+            
+            // 如果当前在日历视图，重新渲染以更新复选框状态
+            if (currentView === 'calendar') {
+                applyFilters();
+            }
+        });
     });
 
-    // 保存检查状态到 Firebase 的函数 - 添加成功回调
+    // 保存检查状态到 Firebase 的函数 - 修改保存路径
     function saveMultiUserCheckStatus(taskId, userId, isChecked) {
         console.log("正在保存状态:", taskId, userId, isChecked);
-        const path = `multiUserTaskCheckStatus/${taskId}/${userId}`;
+        
+        // 使用旧的路径保存，确保兼容性
+        const path = `taskCheckStatus/${taskId}/${userId}`;
+        
         database.ref(path).set(isChecked)
             .then(() => {
-                console.log("状态成功保存");
+                console.log("状态成功保存到:", path);
             })
             .catch(error => {
                 console.error("保存状态失败:", error);
+                // 在UI中显示错误
+                errorMessage.textContent = `保存失败: ${error.message}`;
+                setTimeout(() => {
+                    errorMessage.textContent = '';
+                }, 3000);
             });
     }
 
@@ -767,8 +783,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 在日历标题后添加用户选择器 - 上移位置并缩小字体
-    function addUserSelector(headerElement) {
+    // 创建用户选择器 - 使用固定位置而非相对位置
+    function createUserSelector() {
+        // 检查是否已经存在选择器
+        const existingSelector = document.querySelector('.user-selector');
+        if (existingSelector) {
+            existingSelector.remove();
+        }
+        
         const userSelector = document.createElement('div');
         userSelector.className = 'user-selector';
         
@@ -813,7 +835,7 @@ document.addEventListener('DOMContentLoaded', function() {
         legend.textContent = '勾选颜色代表不同用户的完成状态';
         
         userSelector.appendChild(legend);
-        headerElement.appendChild(userSelector);
+        document.body.appendChild(userSelector);
     }
 
     function renderCalendar(tasksToRender) {
@@ -830,8 +852,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const title = document.createElement('h3'); title.textContent = `${currentDisplayDate.getFullYear()}年 ${currentDisplayDate.getMonth() + 1}月`;
         header.append(nav, title);
         
-        // 添加用户选择器
-        addUserSelector(header);
+        // 创建固定位置的用户选择器
+        createUserSelector();
         
         const gridContainer = document.createElement('div'); gridContainer.className = 'calendar-grid-container';
         const weekdays = document.createElement('div'); weekdays.className = 'calendar-weekdays';
@@ -1285,6 +1307,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 添加SVG网格增强（可选）
         addSVGGrid(ganttRows, (diffDays(minDate, maxDate) + 1) * dayWidth, displayRowIndex * 50);
+        
+        // 移除用户选择器
+        const userSelector = document.querySelector('.user-selector');
+        if (userSelector) {
+            userSelector.remove();
+        }
     }
     
     // 添加SVG网格增强
@@ -1335,6 +1363,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 页面加载时，自动执行数据加载和初始化函数
     loadDataAndInitialize();
+    
+    // 处理页面切换时移除用户选择器
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            console.log('页面变为可见，重新加载数据');
+            // 重新获取数据
+            database.ref('taskCheckStatus').once('value', (snapshot) => {
+                checkStatus = snapshot.val() || {};
+                if (currentView === 'calendar') {
+                    applyFilters();
+                }
+            });
+        }
+    });
 });
 </script>
 
