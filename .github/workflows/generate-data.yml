@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'schedule-generator/schedule.xlsx'  # 修改点1：更新监控路径，正确指向schedule-generator目录下的Excel文件
+      - 'schedule-generator/schedule.xlsx'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 修改点2：添加调试步骤，帮助诊断文件系统问题
       - name: Debug filesystem
         run: |
           pwd
@@ -31,7 +30,7 @@ jobs:
           echo "schedule-generator目录内容:"
           ls -la schedule-generator/
 
-      - name: Setup Node.js with Caching
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -46,12 +45,12 @@ jobs:
         run: node process-excel.js
         working-directory: ./schedule-generator
       
-     - name: Prepare deployment artifact
-  run: |
-    mkdir -p _site
-    cp schedule-generator/index.html _site/
-    cp schedule-generator/data.json _site/
-    cp schedule-generator/students.json _site/ || echo "No students.json file found"
+      - name: Prepare deployment artifact
+        run: |
+          mkdir -p _site
+          cp schedule-generator/index.html _site/
+          cp schedule-generator/data.json _site/
+          cp schedule-generator/students.json _site/ || echo "No students.json file found"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
