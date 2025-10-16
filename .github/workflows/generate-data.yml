@@ -46,13 +46,12 @@ jobs:
         run: node process-excel.js
         working-directory: ./schedule-generator
       
-      - name: Prepare deployment artifact
-        run: |
-          mkdir -p _site
-          cp index.html _site/
-          cp schedule-generator/data.json _site/
-          # 修改点3：添加students.json如果您的脚本也生成了这个文件
-          cp schedule-generator/students.json _site/ || echo "No students.json file found"
+     - name: Prepare deployment artifact
+  run: |
+    mkdir -p _site
+    cp schedule-generator/index.html _site/
+    cp schedule-generator/data.json _site/
+    cp schedule-generator/students.json _site/ || echo "No students.json file found"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
