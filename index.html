@@ -447,6 +447,7 @@
     <div class="filters-container">
         <select id="filter-teacher"></select>
         <select id="filter-topic"></select>
+        <select id="filter-session"></select> <!-- 新增课时筛选 -->
         <span class="date-filter-label">日期范围:</span>
         <input type="date" id="filter-date-start">
         <span class="date-filter-label">至</span>
@@ -569,6 +570,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const filterTeacher = document.getElementById('filter-teacher');
     const filterTopic = document.getElementById('filter-topic');
+    const filterSession = document.getElementById('filter-session'); // 新增课时筛选
     const tooltip = document.getElementById('tooltip');
 
     const filterDateStart = document.getElementById('filter-date-start');
@@ -591,11 +593,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     filterTeacher.addEventListener('change', applyFilters);
     filterTopic.addEventListener('change', applyFilters);
+    filterSession.addEventListener('change', applyFilters); // 新增监听
     filterDateStart.addEventListener('change', applyFilters);
     filterDateEnd.addEventListener('change', applyFilters);
     resetFiltersButton.addEventListener('click', () => {
         filterTeacher.value = '所有教师';
         filterTopic.value = '所有主题';
+        filterSession.value = '所有课时'; // 重置课时筛选
         filterDateStart.value = '';
         filterDateEnd.value = '';
         currentDisplayDate = new Date(); // 重置为当前日期
@@ -667,26 +671,73 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyFilters() {
         if (allTasks.length === 0) {
-            filterTeacher.innerHTML = ''; filterTopic.innerHTML = '';
+            filterTeacher.innerHTML = ''; 
+            filterTopic.innerHTML = '';
+            filterSession.innerHTML = ''; // 清空课时筛选
             renderEmpty();
             return;
         }
+        
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
         const currentSelectedTopic = filterTopic.value || '所有主题';
+        const currentSelectedSession = filterSession.value || '所有课时'; // 获取当前选择的课时
         const dateStart = filterDateStart.value;
         const dateEnd = filterDateEnd.value;
-        const teacherFilteredTasks = (currentSelectedTopic === '所有主题') ? allTasks : allTasks.filter(t => t.topic === currentSelectedTopic);
+        
+        // 填充教师过滤器选项
+        const teacherFilteredTasks = (currentSelectedTopic === '所有主题') 
+            ? allTasks 
+            : allTasks.filter(t => t.topic === currentSelectedTopic);
         const availableTeachers = ['所有教师', ...new Set(teacherFilteredTasks.map(t => t.teacher))];
-        const topicFilteredTasks = (currentSelectedTeacher === '所有教师') ? allTasks : allTasks.filter(t => t.teacher === currentSelectedTeacher);
+        
+        // 填充主题过滤器选项
+        const topicFilteredTasks = (currentSelectedTeacher === '所有教师') 
+            ? allTasks 
+            : allTasks.filter(t => t.teacher === currentSelectedTeacher);
         const availableTopics = ['所有主题', ...new Set(topicFilteredTasks.map(t => t.topic))];
+        
+        // 填充课时过滤器选项
+        const sessionFilterTasks = allTasks.filter(t => {
+            const teacherMatch = (currentSelectedTeacher === '所有教师' || t.teacher === currentSelectedTeacher);
+            const topicMatch = (currentSelectedTopic === '所有主题' || t.topic === currentSelectedTopic);
+            return teacherMatch && topicMatch;
+        });
+        
+        // 提取唯一的课时并排序
+        const availableSessions = ['所有课时'];
+        const uniqueSessions = [...new Set(sessionFilterTasks.map(t => t.session))].filter(Boolean);
+        
+        // 按照课时一、课时二、课时三的顺序排序
+        uniqueSessions.sort((a, b) => {
+            // 提取课时中的数字部分
+            const numA = a.match(/\d+/);
+            const numB = b.match(/\d+/);
+            
+            // 如果都有数字，按数字大小排序
+            if (numA && numB) {
+                return parseInt(numA[0], 10) - parseInt(numB[0], 10);
+            }
+            // 如果只有一个有数字，有数字的排在前面
+            else if (numA) return -1;
+            else if (numB) return 1;
+            // 如果都没有数字，按字母顺序排序
+            else return a.localeCompare(b);
+        });
+        
+        availableSessions.push(...uniqueSessions);
+        
         const finalSelectedTeacher = populateFilterDropdown(filterTeacher, availableTeachers, currentSelectedTeacher);
         const finalSelectedTopic = populateFilterDropdown(filterTopic, availableTopics, currentSelectedTopic);
+        const finalSelectedSession = populateFilterDropdown(filterSession, availableSessions, currentSelectedSession);
+        
         const tasksToRender = allTasks.filter(task => {
             const teacherMatch = (finalSelectedTeacher === '所有教师' || task.teacher === finalSelectedTeacher);
             const topicMatch = (finalSelectedTopic === '所有主题' || task.topic === finalSelectedTopic);
+            const sessionMatch = (finalSelectedSession === '所有课时' || task.session === finalSelectedSession); // 新增课时匹配
             const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && (!dateEnd || task.sessionStart <= dateEnd);
-            return teacherMatch && topicMatch && dateMatch;
+            return teacherMatch && topicMatch && sessionMatch && dateMatch;
         });
+        
         updateColors();
         
         if (currentView === 'gantt') {
