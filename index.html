@@ -430,6 +430,14 @@
             color: #888;
             border-top: 1px solid var(--medium-gray);
         }
+
+        /* 新增：筛选器标签样式 */
+        .filter-label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #555;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -445,9 +453,16 @@
         <p id="error-message">正在加载数据...</p>
     </div>
     <div class="filters-container">
+        <span class="filter-label">教师:</span>
         <select id="filter-teacher"></select>
+        
+        <span class="filter-label">主题:</span>
         <select id="filter-topic"></select>
-        <span class="date-filter-label">日期范围:</span>
+        
+        <span class="filter-label">课时:</span>
+        <select id="filter-session"></select>
+        
+        <span class="filter-label">日期范围:</span>
         <input type="date" id="filter-date-start">
         <span class="date-filter-label">至</span>
         <input type="date" id="filter-date-end">
@@ -503,26 +518,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 从 Firebase 加载检查状态 - 改为直接使用 taskCheckStatus 路径
     database.ref('taskCheckStatus').on('value', (snapshot) => {
-        console.log("正在加载旧版检查状态...");
-        const oldData = snapshot.val() || {};
+        console.log("正在加载检查状态...");
+        checkStatus = snapshot.val() || {};
+        console.log("已从Firebase加载状态:", checkStatus);
         
-        // 从 Firebase 加载多用户检查状态
-        database.ref('taskCheckStatus').once('value', (snapshot) => {
-            checkStatus = snapshot.val() || {};
-            console.log("已从Firebase加载状态:", checkStatus);
-            
-            // 如果当前在日历视图，重新渲染以更新复选框状态
-            if (currentView === 'calendar') {
-                applyFilters();
-            }
-        });
+        // 如果当前在日历视图，重新渲染以更新复选框状态
+        if (currentView === 'calendar') {
+            applyFilters();
+        }
     });
 
-    // 保存检查状态到 Firebase 的函数 - 修改保存路径
+    // 保存检查状态到 Firebase 的函数
     function saveMultiUserCheckStatus(taskId, userId, isChecked) {
         console.log("正在保存状态:", taskId, userId, isChecked);
         
-        // 使用旧的路径保存，确保兼容性
         const path = `taskCheckStatus/${taskId}/${userId}`;
         
         database.ref(path).set(isChecked)
@@ -531,7 +540,6 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error("保存状态失败:", error);
-                // 在UI中显示错误
                 errorMessage.textContent = `保存失败: ${error.message}`;
                 setTimeout(() => {
                     errorMessage.textContent = '';
@@ -569,6 +577,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const filterTeacher = document.getElementById('filter-teacher');
     const filterTopic = document.getElementById('filter-topic');
+    const filterSession = document.getElementById('filter-session'); // 课时筛选
     const tooltip = document.getElementById('tooltip');
 
     const filterDateStart = document.getElementById('filter-date-start');
@@ -591,11 +600,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     filterTeacher.addEventListener('change', applyFilters);
     filterTopic.addEventListener('change', applyFilters);
+    filterSession.addEventListener('change', applyFilters); // 课时筛选监听器
     filterDateStart.addEventListener('change', applyFilters);
     filterDateEnd.addEventListener('change', applyFilters);
     resetFiltersButton.addEventListener('click', () => {
         filterTeacher.value = '所有教师';
         filterTopic.value = '所有主题';
+        filterSession.value = '所有课时'; // 重置课时筛选
         filterDateStart.value = '';
         filterDateEnd.value = '';
         currentDisplayDate = new Date(); // 重置为当前日期
@@ -606,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
     calendarViewBtn.addEventListener('click', () => switchView('calendar'));
 
     function switchView(view) {
-        if (currentView === view) return; // 如果已经是当前视图，不做任何操作
+        if (currentView === view) return;
         
         const currentViewEl = document.querySelector('.view.active');
         const newViewEl = document.getElementById(`${view}-view`);
@@ -641,6 +652,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 allTasks = data;
                 errorMessage.textContent = '';
 
+                // 调试输出所有课时值
+                const allSessions = [...new Set(data.map(t => t.session))].filter(Boolean);
+                console.log("数据中的所有课时:", allSessions);
+
                 if (allTasks.length === 0) {
                     throw new Error("加载的数据为空。请检查后台 schedule.xlsx 文件内容是否正确。");
                 }
@@ -660,33 +675,109 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function populateFilterDropdown(selectElement, options, currentlySelected) {
+        // 如果当前选择项不再可用，使用第一个选项
         const finalSelection = options.includes(currentlySelected) ? currentlySelected : options[0];
-        selectElement.innerHTML = options.map(option => `<option value="${option}" ${option === finalSelection ? 'selected' : ''}>${option}</option>`).join('');
+        
+        // 生成选项并设置选中项
+        selectElement.innerHTML = options.map(option => 
+            `<option value="${option}" ${option === finalSelection ? 'selected' : ''}>${option}</option>`
+        ).join('');
+        
         return finalSelection;
     }
 
     function applyFilters() {
         if (allTasks.length === 0) {
-            filterTeacher.innerHTML = ''; filterTopic.innerHTML = '';
+            filterTeacher.innerHTML = ''; 
+            filterTopic.innerHTML = '';
+            filterSession.innerHTML = '';
             renderEmpty();
             return;
         }
+        
+        // 获取当前选择的筛选条件
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
         const currentSelectedTopic = filterTopic.value || '所有主题';
+        const currentSelectedSession = filterSession.value || '所有课时'; 
         const dateStart = filterDateStart.value;
         const dateEnd = filterDateEnd.value;
-        const teacherFilteredTasks = (currentSelectedTopic === '所有主题') ? allTasks : allTasks.filter(t => t.topic === currentSelectedTopic);
-        const availableTeachers = ['所有教师', ...new Set(teacherFilteredTasks.map(t => t.teacher))];
-        const topicFilteredTasks = (currentSelectedTeacher === '所有教师') ? allTasks : allTasks.filter(t => t.teacher === currentSelectedTeacher);
-        const availableTopics = ['所有主题', ...new Set(topicFilteredTasks.map(t => t.topic))];
+        
+        // 记录已经应用的筛选条件，用于调试
+        console.log("当前筛选条件:", {
+            教师: currentSelectedTeacher,
+            主题: currentSelectedTopic,
+            课时: currentSelectedSession,
+            开始日期: dateStart || "未设置",
+            结束日期: dateEnd || "未设置"
+        });
+        
+        // ======== 1. 教师筛选选项 ========
+        // 如果选择了特定主题，只显示教授该主题的教师
+        const teacherFilteredTasks = (currentSelectedTopic === '所有主题') 
+            ? allTasks 
+            : allTasks.filter(t => t.topic === currentSelectedTopic);
+            
+        // 如果选择了特定课时，只显示教授该课时的教师
+        const sessionFilteredTeachers = (currentSelectedSession === '所有课时')
+            ? teacherFilteredTasks
+            : teacherFilteredTasks.filter(t => t.session === currentSelectedSession);
+            
+        const availableTeachers = ['所有教师', ...new Set(sessionFilteredTeachers.map(t => t.teacher))];
+        
+        // ======== 2. 主题筛选选项 ========
+        // 如果选择了特定教师，只显示该教师教授的主题
+        const topicFilteredTasks = (currentSelectedTeacher === '所有教师') 
+            ? allTasks 
+            : allTasks.filter(t => t.teacher === currentSelectedTeacher);
+            
+        // 如果选择了特定课时，只显示该课时的主题
+        const sessionFilteredTopics = (currentSelectedSession === '所有课时')
+            ? topicFilteredTasks
+            : topicFilteredTasks.filter(t => t.session === currentSelectedSession);
+        
+        // 获取唯一的主题列表 - 修复重复主题问题
+        const availableTopics = ['所有主题', ...new Set(sessionFilteredTopics.map(t => t.topic))].sort();
+        
+        // ======== 3. 课时筛选选项 ========
+        // 获取符合当前教师和主题筛选条件的任务
+        const tasksByTeacherAndTopic = allTasks.filter(t => {
+            const teacherMatch = (currentSelectedTeacher === '所有教师' || t.teacher === currentSelectedTeacher);
+            const topicMatch = (currentSelectedTopic === '所有主题' || t.topic === currentSelectedTopic);
+            return teacherMatch && topicMatch;
+        });
+        
+        // 提取唯一的课时并按正确顺序排序
+        const allSessions = [...new Set(tasksByTeacherAndTopic.map(t => t.session))].filter(Boolean);
+        const sortedSessions = sortSessions(allSessions);
+        const availableSessions = ['所有课时', ...sortedSessions];
+        
+        // 填充筛选下拉框并获取最终选中的值
         const finalSelectedTeacher = populateFilterDropdown(filterTeacher, availableTeachers, currentSelectedTeacher);
         const finalSelectedTopic = populateFilterDropdown(filterTopic, availableTopics, currentSelectedTopic);
+        const finalSelectedSession = populateFilterDropdown(filterSession, availableSessions, currentSelectedSession);
+        
+        // 记录填充的选项，用于调试
+        console.log("筛选选项:", {
+            可选教师: availableTeachers, 
+            可选主题: availableTopics,
+            可选课时: availableSessions
+        });
+        
+        // ======== 4. 应用所有筛选条件 ========
         const tasksToRender = allTasks.filter(task => {
             const teacherMatch = (finalSelectedTeacher === '所有教师' || task.teacher === finalSelectedTeacher);
             const topicMatch = (finalSelectedTopic === '所有主题' || task.topic === finalSelectedTopic);
-            const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && (!dateEnd || task.sessionStart <= dateEnd);
-            return teacherMatch && topicMatch && dateMatch;
+            const sessionMatch = (finalSelectedSession === '所有课时' || 
+                                 (task.session && task.session === finalSelectedSession));
+            const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && 
+                             (!dateEnd || task.sessionStart <= dateEnd);
+                             
+            return teacherMatch && topicMatch && sessionMatch && dateMatch;
         });
+        
+        // 记录筛选后的任务数量
+        console.log(`筛选后剩余 ${tasksToRender.length} 个任务`);
+        
         updateColors();
         
         if (currentView === 'gantt') {
@@ -694,6 +785,25 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             renderCalendar(tasksToRender);
         }
+    }
+    
+    // 辅助函数：对课时进行智能排序
+    function sortSessions(sessions) {
+        return sessions.sort((a, b) => {
+            // 提取课时中的数字部分
+            const numA = a ? a.match(/\d+/) : null;
+            const numB = b ? b.match(/\d+/) : null;
+            
+            // 如果都有数字，按数字大小排序
+            if (numA && numB) {
+                return parseInt(numA[0], 10) - parseInt(numB[0], 10);
+            }
+            // 如果只有一个有数字，有数字的排在前面
+            else if (numA) return -1;
+            else if (numB) return 1;
+            // 如果都没有数字，按字母顺序排序
+            else return (a || '').localeCompare(b || '');
+        });
     }
     
     function updateColors() {
@@ -761,7 +871,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function hideTooltip() { tooltip.classList.remove('visible'); }
     function updateTooltipPosition(event) { tooltip.style.left = `${event.clientX}px`; tooltip.style.top = `${event.clientY - 15}px`; }
 
-    // 简化的折叠/展开函数
     function toggleGroup(groupName) {
         if (collapsedGroups.has(groupName)) {
             collapsedGroups.delete(groupName);
@@ -769,7 +878,6 @@ document.addEventListener('DOMContentLoaded', function() {
             collapsedGroups.add(groupName);
         }
         
-        // 触发重新渲染以正确处理折叠状态
         applyFilters();
     }
 
@@ -783,9 +891,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 创建用户选择器 - 使用固定位置而非相对位置
     function createUserSelector() {
-        // 检查是否已经存在选择器
         const existingSelector = document.querySelector('.user-selector');
         if (existingSelector) {
             existingSelector.remove();
@@ -829,7 +935,6 @@ document.addEventListener('DOMContentLoaded', function() {
             userSelector.appendChild(userOption);
         });
         
-        // 添加说明文字
         const legend = document.createElement('div');
         legend.className = 'user-selector-legend';
         legend.textContent = '勾选颜色代表不同用户的完成状态';
@@ -852,7 +957,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const title = document.createElement('h3'); title.textContent = `${currentDisplayDate.getFullYear()}年 ${currentDisplayDate.getMonth() + 1}月`;
         header.append(nav, title);
         
-        // 创建固定位置的用户选择器
         createUserSelector();
         
         const gridContainer = document.createElement('div'); gridContainer.className = 'calendar-grid-container';
@@ -882,7 +986,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const courseStartDate = new Date(task.courseStart + 'T00:00:00'); 
             const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
             
-            // 检查是否是信息老师
             const isInfoTeacher = task.teacher.includes('信息老师') || task.teacher === '信息老师';
             
             if (task.courseStart === task.courseEnd) {
@@ -891,40 +994,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (dayCell) { 
                         const marker = document.createElement('div'); 
                         
-                        // 创建唯一任务 ID
                         const taskId = `task-${task.teacher}-${task.topic}-${task.session}-single-${task.courseStart}`;
                         marker.dataset.taskId = taskId;
                         
-                        // 如果是信息老师，使用特殊的类和样式
                         if (isInfoTeacher) {
                             marker.className = 'calendar-marker marker-info-teacher';
                         } else {
                             marker.className = 'calendar-marker marker-single-day';
                         }
                         
-                        // 获取此任务的所有用户勾选状态
                         const taskChecks = checkStatus[taskId] || {};
                         
-                        // 创建多用户复选框容器
                         const checkContainer = document.createElement('div');
                         checkContainer.className = 'multi-checkbox';
                         
-                        // 为每个用户创建复选框
                         users.forEach(user => {
                             const isChecked = taskChecks[user.id] || false;
                             
-                            // 创建复选框容器
                             const checkboxContainer = document.createElement('div');
                             checkboxContainer.className = 'checkbox-container';
                             
-                            // 创建实际的复选框(隐藏)
                             const checkbox = document.createElement('input');
                             checkbox.type = 'checkbox';
                             checkbox.className = 'user-checkbox';
                             checkbox.dataset.userId = user.id;
                             checkbox.checked = isChecked;
                             
-                            // 创建显示的复选框
                             const checkboxDisplay = document.createElement('div');
                             checkboxDisplay.className = `checkbox-display ${user.id}`;
                             
@@ -942,10 +1037,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkContainer.appendChild(checkboxContainer);
                         });
                         
-                        // 添加到标记开始
                         marker.prepend(checkContainer);
                         
-                        // 添加课时信息
                         marker.appendChild(document.createTextNode(
                             `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`
                         ));
@@ -961,40 +1054,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (startCell) { 
                         const marker = document.createElement('div'); 
                         
-                        // 创建唯一任务 ID
                         const taskId = `task-${task.teacher}-${task.topic}-${task.session}-start-${task.courseStart}`;
                         marker.dataset.taskId = taskId;
                         
-                        // 信息老师的开课使用深紫色
                         if (isInfoTeacher) {
                             marker.className = 'calendar-marker marker-info-start';
                         } else {
                             marker.className = 'calendar-marker marker-start';
                         }
                         
-                        // 获取此任务的所有用户勾选状态
                         const taskChecks = checkStatus[taskId] || {};
                         
-                        // 创建多用户复选框容器
                         const checkContainer = document.createElement('div');
                         checkContainer.className = 'multi-checkbox';
                         
-                        // 为每个用户创建复选框
                         users.forEach(user => {
                             const isChecked = taskChecks[user.id] || false;
                             
-                            // 创建复选框容器
                             const checkboxContainer = document.createElement('div');
                             checkboxContainer.className = 'checkbox-container';
                             
-                            // 创建实际的复选框(隐藏)
                             const checkbox = document.createElement('input');
                             checkbox.type = 'checkbox';
                             checkbox.className = 'user-checkbox';
                             checkbox.dataset.userId = user.id;
                             checkbox.checked = isChecked;
                             
-                            // 创建显示的复选框
                             const checkboxDisplay = document.createElement('div');
                             checkboxDisplay.className = `checkbox-display ${user.id}`;
                             
@@ -1012,10 +1097,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkContainer.appendChild(checkboxContainer);
                         });
                         
-                        // 添加到标记开始
                         marker.prepend(checkContainer);
                         
-                        // 添加课时信息到开课标记
                         marker.appendChild(document.createTextNode(
                             `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`
                         ));
@@ -1030,40 +1113,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (endCell) { 
                         const marker = document.createElement('div'); 
                         
-                        // 创建唯一任务 ID
                         const taskId = `task-${task.teacher}-${task.topic}-${task.session}-end-${task.courseEnd}`;
                         marker.dataset.taskId = taskId;
                         
-                        // 信息老师的结课使用浅紫色
                         if (isInfoTeacher) {
                             marker.className = 'calendar-marker marker-info-end';
                         } else {
                             marker.className = 'calendar-marker marker-end';
                         }
                         
-                        // 获取此任务的所有用户勾选状态
                         const taskChecks = checkStatus[taskId] || {};
                         
-                        // 创建多用户复选框容器
                         const checkContainer = document.createElement('div');
                         checkContainer.className = 'multi-checkbox';
                         
-                        // 为每个用户创建复选框
                         users.forEach(user => {
                             const isChecked = taskChecks[user.id] || false;
                             
-                            // 创建复选框容器
                             const checkboxContainer = document.createElement('div');
                             checkboxContainer.className = 'checkbox-container';
                             
-                            // 创建实际的复选框(隐藏)
                             const checkbox = document.createElement('input');
                             checkbox.type = 'checkbox';
                             checkbox.className = 'user-checkbox';
                             checkbox.dataset.userId = user.id;
                             checkbox.checked = isChecked;
                             
-                            // 创建显示的复选框
                             const checkboxDisplay = document.createElement('div');
                             checkboxDisplay.className = `checkbox-display ${user.id}`;
                             
@@ -1081,10 +1156,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkContainer.appendChild(checkboxContainer);
                         });
                         
-                        // 添加到标记开始
                         marker.prepend(checkContainer);
                         
-                        // 添加课时信息到结课标记
                         marker.appendChild(document.createTextNode(
                             `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`
                         ));
@@ -1217,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tasks.forEach(task => {
                     const taskItemEl = document.createElement('div'); 
                     taskItemEl.className = 'gantt-task-item'; 
-                    taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session}</div>`; 
+                    taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session || ''}</div>`; 
                     taskItemEl.dataset.rowIndex = displayRowIndex; 
                     taskItemEl.dataset.groupName = teacher; 
                     ganttTasksContainer.appendChild(taskItemEl);
@@ -1255,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; 
                         sessionBar.style.width = `${sessionDuration * dayWidth}px`; 
                         sessionBar.style.backgroundColor = topicColors[task.topic];
-                        sessionBar.textContent = task.session;
+                        sessionBar.textContent = task.session || '';
                         sessionBar.dataset.rowIndex = displayRowIndex; 
                         sessionBar.dataset.groupName = teacher; 
                         ganttRows.appendChild(sessionBar); 
