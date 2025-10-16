@@ -22,8 +22,8 @@
             --user-charlene: #f1c40f;  /* 黄色 */
             --user-yeung: #2c3e50;     /* 黑色 */
             
-            /* 学生颜色 */
-            --student-color: #9b59b6;  /* 紫色 */
+            /* 学生颜色 - 改为蓝色系列 */
+            --student-color: #3498db;  /* 蓝色 */
         }
         html, body {
             height: 100%;
@@ -236,18 +236,20 @@
         }
         .gantt-bar-course.is-hovered .gantt-bar-course-text { opacity: 1; }
         
-        /* 学生学习时间样式 */
+        /* 学生学习时间样式 - 修改为蓝色 */
         .gantt-bar-student {
             height: 16px;
             top: 18px;
             z-index: 3;
-            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.05), rgba(0,0,0,0.05) 5px, rgba(0,0,0,0) 5px, rgba(0,0,0,0) 10px);
+            background-color: var(--student-color);
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.1) 5px, rgba(255,255,255,0) 5px, rgba(255,255,255,0) 10px);
             border: 1px solid rgba(0,0,0,0.2);
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .gantt-bar-student.completed {
             background-image: none;
+            background-color: #2980b9; /* 深蓝色表示完成 */
         }
         
         .gantt-bar-student.is-hovered { 
@@ -256,7 +258,7 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
         
-        /* 学生学习时间日历标记 */
+        /* 学生学习时间日历标记 - 修改为蓝色 */
         .calendar-marker.student-marker {
             background-color: var(--student-color);
             border-radius: 12px;
@@ -264,7 +266,7 @@
         }
         
         .calendar-marker.student-marker.completed {
-            background-color: #8e44ad;
+            background-color: #2980b9; /* 深蓝色表示完成 */
         }
         
         .gantt-today-line { 
@@ -490,6 +492,17 @@
             color: #555;
             margin-right: 5px;
         }
+        
+        /* 隐藏筛选器的样式 */
+        .filters-container .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .filters-container .filter-group.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -513,11 +526,15 @@
         <p id="error-message">正在加载数据...</p>
     </div>
     <div class="filters-container">
-        <span class="filter-label">教师:</span>
-        <select id="filter-teacher"></select>
+        <div class="filter-group" id="teacher-filter-group">
+            <span class="filter-label">教师:</span>
+            <select id="filter-teacher"></select>
+        </div>
         
-        <span class="filter-label">学生:</span>
-        <select id="filter-student"></select>
+        <div class="filter-group" id="student-filter-group">
+            <span class="filter-label">学生:</span>
+            <select id="filter-student"></select>
+        </div>
         
         <span class="filter-label">主题:</span>
         <select id="filter-topic"></select>
@@ -656,13 +673,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const lastUpdatedTimeElement = document.getElementById('last-updated-time');
     const currentTimeElement = document.getElementById('current-time');
     
+    // 筛选器组元素
+    const teacherFilterGroup = document.getElementById('teacher-filter-group');
+    const studentFilterGroup = document.getElementById('student-filter-group');
+    
     // 添加视图模式选择监听
     document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
         radio.addEventListener('change', function() {
             currentViewMode = this.value;
+            updateFilterVisibility();
             applyFilters();
         });
     });
+    
+    // 更新筛选器可见性
+    function updateFilterVisibility() {
+        if (currentViewMode === 'teacher-only') {
+            teacherFilterGroup.classList.remove('hidden');
+            studentFilterGroup.classList.add('hidden');
+        } else if (currentViewMode === 'student-only') {
+            teacherFilterGroup.classList.add('hidden');
+            studentFilterGroup.classList.remove('hidden');
+        } else {
+            teacherFilterGroup.classList.remove('hidden');
+            studentFilterGroup.classList.remove('hidden');
+        }
+    }
     
     // 更新当前时间显示
     function updateCurrentTime() {
@@ -687,6 +723,7 @@ document.addEventListener('DOMContentLoaded', function() {
         filterDateEnd.value = '';
         document.querySelector('input[name="view-mode"][value="all"]').checked = true;
         currentViewMode = 'all';
+        updateFilterVisibility();
         currentDisplayDate = new Date(); // 重置为当前日期
         applyFilters();
     });
@@ -794,6 +831,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 collapsedGroups.clear();
                 currentDisplayDate = new Date(); // 使用当前日期
+                updateFilterVisibility(); // 初始化筛选器可见性
                 resetFiltersButton.click(); // 触发第一次渲染
             })
             .catch(err => {
@@ -826,21 +864,22 @@ document.addEventListener('DOMContentLoaded', function() {
         return finalSelection;
     }
 
-    // 正确比较课时数字的函数
+    // 自定义排序函数
+    function getTopicOrder(topic) {
+        const order = ['压力的枷锁', '松弛技巧', '呼吸技巧', '营养和食物', '正面自语'];
+        const index = order.indexOf(topic);
+        return index === -1 ? 999 : index; // 未知主题排在最后
+    }
+
+    function getSessionOrder(session) {
+        const order = ['课时一', '课时二', '课时三'];
+        const index = order.indexOf(session);
+        return index === -1 ? 999 : index; // 未知课时排在最后
+    }
+
+    // 正确比较课时数字的函数 - 使用自定义排序
     function compareSessionNumbers(a, b) {
-        // 提取数字部分
-        const numA = a.match(/\d+/);
-        const numB = b.match(/\d+/);
-        
-        // 如果都有数字，按数字大小排序
-        if (numA && numB) {
-            return parseInt(numA[0], 10) - parseInt(numB[0], 10);
-        }
-        // 如果只有一个有数字，有数字的排在前面
-        else if (numA) return -1;
-        else if (numB) return 1;
-        // 如果都没有数字，按字母顺序排序
-        else return a.localeCompare(b);
+        return getSessionOrder(a) - getSessionOrder(b);
     }
 
     function applyFilters() {
@@ -896,10 +935,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // 合并主题、课时和名称列表
-        const uniqueTopics = [...new Set([...teacherTopics, ...studentTopics])].sort();
+        // 合并主题、课时和名称列表，并使用自定义排序
+        const uniqueTopics = [...new Set([...teacherTopics, ...studentTopics])];
+        uniqueTopics.sort((a, b) => getTopicOrder(a) - getTopicOrder(b));
+        
         const uniqueSessions = [...new Set([...teacherSessions, ...studentSessions])];
         uniqueSessions.sort(compareSessionNumbers);
+        
         const uniqueStudentNames = [...new Set(studentNames)].sort();
         
         // 填充筛选下拉框
@@ -1408,8 +1450,51 @@ document.addEventListener('DOMContentLoaded', function() {
                         const dayCell = grid.querySelector(`.calendar-day[data-date="${session.startTime}"]`);
                         if (dayCell) { 
                             const marker = document.createElement('div');
+                            
+                            const taskId = `student-${session.studentName}-${session.topic}-${session.session}-single-${session.startTime}`;
+                            marker.dataset.taskId = taskId;
+                            
                             marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
-                            marker.textContent = `${session.studentName} - ${session.topic} ${session.session}`;
+                            
+                            const taskChecks = checkStatus[taskId] || {};
+                            
+                            const checkContainer = document.createElement('div');
+                            checkContainer.className = 'multi-checkbox';
+                            
+                            users.forEach(user => {
+                                const isChecked = taskChecks[user.id] || false;
+                                
+                                const checkboxContainer = document.createElement('div');
+                                checkboxContainer.className = 'checkbox-container';
+                                
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.className = 'user-checkbox';
+                                checkbox.dataset.userId = user.id;
+                                checkbox.checked = isChecked;
+                                
+                                const checkboxDisplay = document.createElement('div');
+                                checkboxDisplay.className = `checkbox-display ${user.id}`;
+                                
+                                checkbox.addEventListener('change', function() {
+                                    const isChecked = checkbox.checked;
+                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
+                                    
+                                    if (isChecked) {
+                                        showFeedback(marker, user.id);
+                                    }
+                                });
+                                
+                                checkboxContainer.appendChild(checkbox);
+                                checkboxContainer.appendChild(checkboxDisplay);
+                                checkContainer.appendChild(checkboxContainer);
+                            });
+                            
+                            marker.prepend(checkContainer);
+                            
+                            marker.appendChild(document.createTextNode(
+                                `${session.studentName} - ${session.topic} ${session.session}`
+                            ));
                             
                             // 添加悬停交互
                             addStudyInteractionListeners(session, marker);
@@ -1422,8 +1507,51 @@ document.addEventListener('DOMContentLoaded', function() {
                         const startCell = grid.querySelector(`.calendar-day[data-date="${session.startTime}"]`);
                         if (startCell) { 
                             const marker = document.createElement('div');
+                            
+                            const taskId = `student-${session.studentName}-${session.topic}-${session.session}-start-${session.startTime}`;
+                            marker.dataset.taskId = taskId;
+                            
                             marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
-                            marker.textContent = `${session.studentName} - ${session.topic} ${session.session} (开始)`;
+                            
+                            const taskChecks = checkStatus[taskId] || {};
+                            
+                            const checkContainer = document.createElement('div');
+                            checkContainer.className = 'multi-checkbox';
+                            
+                            users.forEach(user => {
+                                const isChecked = taskChecks[user.id] || false;
+                                
+                                const checkboxContainer = document.createElement('div');
+                                checkboxContainer.className = 'checkbox-container';
+                                
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.className = 'user-checkbox';
+                                checkbox.dataset.userId = user.id;
+                                checkbox.checked = isChecked;
+                                
+                                const checkboxDisplay = document.createElement('div');
+                                checkboxDisplay.className = `checkbox-display ${user.id}`;
+                                
+                                checkbox.addEventListener('change', function() {
+                                    const isChecked = checkbox.checked;
+                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
+                                    
+                                    if (isChecked) {
+                                        showFeedback(marker, user.id);
+                                    }
+                                });
+                                
+                                checkboxContainer.appendChild(checkbox);
+                                checkboxContainer.appendChild(checkboxDisplay);
+                                checkContainer.appendChild(checkboxContainer);
+                            });
+                            
+                            marker.prepend(checkContainer);
+                            
+                            marker.appendChild(document.createTextNode(
+                                `${session.studentName} - ${session.topic} ${session.session} (开始)`
+                            ));
                             
                             addStudyInteractionListeners(session, marker);
                             startCell.appendChild(marker);
@@ -1435,8 +1563,51 @@ document.addEventListener('DOMContentLoaded', function() {
                         const endCell = grid.querySelector(`.calendar-day[data-date="${session.endTime}"]`);
                         if (endCell) { 
                             const marker = document.createElement('div');
+                            
+                            const taskId = `student-${session.studentName}-${session.topic}-${session.session}-end-${session.endTime}`;
+                            marker.dataset.taskId = taskId;
+                            
                             marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
-                            marker.textContent = `${session.studentName} - ${session.topic} ${session.session} (结束)`;
+                            
+                            const taskChecks = checkStatus[taskId] || {};
+                            
+                            const checkContainer = document.createElement('div');
+                            checkContainer.className = 'multi-checkbox';
+                            
+                            users.forEach(user => {
+                                const isChecked = taskChecks[user.id] || false;
+                                
+                                const checkboxContainer = document.createElement('div');
+                                checkboxContainer.className = 'checkbox-container';
+                                
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.className = 'user-checkbox';
+                                checkbox.dataset.userId = user.id;
+                                checkbox.checked = isChecked;
+                                
+                                const checkboxDisplay = document.createElement('div');
+                                checkboxDisplay.className = `checkbox-display ${user.id}`;
+                                
+                                checkbox.addEventListener('change', function() {
+                                    const isChecked = checkbox.checked;
+                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
+                                    
+                                    if (isChecked) {
+                                        showFeedback(marker, user.id);
+                                    }
+                                });
+                                
+                                checkboxContainer.appendChild(checkbox);
+                                checkboxContainer.appendChild(checkboxDisplay);
+                                checkContainer.appendChild(checkboxContainer);
+                            });
+                            
+                            marker.prepend(checkContainer);
+                            
+                            marker.appendChild(document.createTextNode(
+                                `${session.studentName} - ${session.topic} ${session.session} (结束)`
+                            ));
                             
                             addStudyInteractionListeners(session, marker);
                             endCell.appendChild(marker);
@@ -1539,13 +1710,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const sortedTeachers = Object.keys(groupedTasks).map(teacher => { 
                 const tasks = groupedTasks[teacher]; 
                 tasks.sort((a, b) => {
-                    // 首先按主题排序
-                    const topicCompare = a.topic.localeCompare(b.topic);
+                    // 首先按主题排序（使用自定义顺序）
+                    const topicCompare = getTopicOrder(a.topic) - getTopicOrder(b.topic);
                     if (topicCompare !== 0) return topicCompare;
                     
-                    // 如果主题相同，按课时排序
+                    // 如果主题相同，按课时排序（使用自定义顺序）
                     if (a.session && b.session) {
-                        return compareSessionNumbers(a.session, b.session);
+                        return getSessionOrder(a.session) - getSessionOrder(b.session);
                     }
                     
                     // 如果一个有课时一个没有，有课时的优先
@@ -1660,15 +1831,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 渲染每个学生的数据
             Object.entries(groupedByStudent).forEach(([studentName, sessions]) => {
-                // 排序学生的学习记录
+                // 排序学生的学习记录（使用自定义顺序）
                 sessions.sort((a, b) => {
-                    // 首先按主题排序
-                    const topicCompare = (a.topic || '').localeCompare(b.topic || '');
+                    // 首先按主题排序（使用自定义顺序）
+                    const topicCompare = getTopicOrder(a.topic || '') - getTopicOrder(b.topic || '');
                     if (topicCompare !== 0) return topicCompare;
                     
-                    // 然后按课时排序
+                    // 然后按课时排序（使用自定义顺序）
                     if (a.session && b.session) {
-                        return compareSessionNumbers(a.session, b.session);
+                        return getSessionOrder(a.session) - getSessionOrder(b.session);
                     } else if (a.session) {
                         return -1;
                     } else if (b.session) {
@@ -1728,7 +1899,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         studyBar.style.top = `${displayRowIndex * 50}px`;
                         studyBar.style.left = `${studyStartOffset * dayWidth}px`; 
                         studyBar.style.width = `${studyDuration * dayWidth}px`; 
-                        studyBar.style.backgroundColor = topicColors[session.topic] || '#9b59b6'; // 使用主题颜色或默认紫色
+                        studyBar.style.backgroundColor = topicColors[session.topic] || '#3498db'; // 使用主题颜色或默认蓝色
                         studyBar.textContent = session.session || '';
                         studyBar.dataset.rowIndex = displayRowIndex; 
                         studyBar.dataset.groupName = studentGroupId; 
