@@ -5,7 +5,10 @@ on:
     branches:
       - main
     paths:
-      - 'schedule-generator/schedule.xlsx'
+      - 'schedule-generator/schedule.xlsx'   # 当Excel更新时自动执行
+      - 'schedule-generator/process-excel.js'
+      - 'schedule-generator/package.json'
+      - 'index.html'
   workflow_dispatch:
 
 permissions:
@@ -19,47 +22,57 @@ jobs:
       name: github-pages
     runs-on: ubuntu-latest
     steps:
+      # Step 1: 获取仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: 打印文件系统结构（调试用）
       - name: Debug filesystem
         run: |
           pwd
           echo "仓库根目录内容:"
           ls -la
-          echo "schedule-generator目录内容:"
+          echo "schedule-generator 目录内容:"
           ls -la schedule-generator/
 
-      - name: Setup Node.js
+      # Step 3: 安装 Node.js
+      - name: Setup Node.js with Caching
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: schedule-generator/package.json
 
+      # Step 4: 安装依赖
       - name: Install dependencies
         run: npm install
         working-directory: ./schedule-generator
 
+      # Step 5: 执行 Excel 转换脚本
       - name: Generate data.json from Excel
         run: node process-excel.js
         working-directory: ./schedule-generator
-      
+
+      # Step 6: 准备部署内容到 GitHub Pages
+      # ✅ 注意，这里改成从仓库根目录复制 index.html
       - name: Prepare deployment artifact
         run: |
           mkdir -p _site
-          cp schedule-generator/index.html _site/
+          cp index.html _site/
           cp schedule-generator/data.json _site/
           cp schedule-generator/students.json _site/ || echo "No students.json file found"
-      
+
+      # Step 7: 初始化 pages 环境
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
+      # Step 8: 上传静态产物
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './_site'
           
+      # Step 9: 部署到 GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
