@@ -1,102 +1,111 @@
+// 文件名: process-excel.js
 const xlsx = require('xlsx');
 const fs = require('fs');
-const path = require('path'); // 添加缺失的path模块导入
 
-// 定义文件路径
-const excelFilePath = path.join(__dirname, '..', 'schedule.xlsx');
-const outputFilePath = path.join(__dirname, 'data.json');
-
-try {
-  console.log("开始处理Excel文件...");
-  console.log("Excel文件路径:", excelFilePath);
-  
-  // 检查Excel文件是否存在
-  if (!fs.existsSync(excelFilePath)) {
-    console.error(`错误：找不到Excel文件: ${excelFilePath}`);
-    process.exit(1);
-  }
-
-  // 读取Excel文件
-  const workbook = xlsx.readFile(excelFilePath, { cellDates: true });
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  
-  // 转换为JSON
-  const jsonData = xlsx.utils.sheet_to_json(worksheet);
-  console.log(`从Excel中读取了${jsonData.length}行数据`);
-  
-  // 数据处理
-  const processedTasks = [];
-  let currentTeacher = '', currentTopic = '', currentCourseStart = null, currentCourseEnd = null;
-  
-  const formatDate = (date) => {
-    if (!date) return null;
+// 读取Excel文件
+function processExcel() {
+    console.log('开始处理Excel文件...');
+    const workbook = xlsx.readFile('schedule.xlsx');
     
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return null;
-      
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    } catch (e) {
-      console.error("日期转换错误:", e);
-      return null;
-    }
-  };
-  
-  jsonData.forEach((row, index) => {
-    // 跳过空行
-    if (Object.values(row).every(val => val === null || val === undefined || String(val).trim() === '')) {
-      return;
+    // 获取Sheet名称
+    const sheetNames = workbook.SheetNames;
+    console.log(`Excel包含 ${sheetNames.length} 个工作表:`, sheetNames);
+    
+    // 处理教师课程数据 (Sheet1)
+    const teacherSheet = workbook.Sheets[sheetNames[0]];
+    const teacherData = xlsx.utils.sheet_to_json(teacherSheet);
+    console.log(`从 ${sheetNames[0]} 读取了 ${teacherData.length} 条记录`);
+    
+    // 处理学生学习数据 (Sheet2), 如果存在
+    let studentData = [];
+    if (sheetNames.length > 1) {
+        const studentSheet = workbook.Sheets[sheetNames[1]];
+        studentData = xlsx.utils.sheet_to_json(studentSheet);
+        console.log(`从 ${sheetNames[1]} 读取了 ${studentData.length} 条记录`);
     }
     
-    // 处理任课教师
-    if (row['任课教师'] && String(row['任课教师']).trim() !== '') {
-      currentTeacher = String(row['任课教师']).trim();
+    // 转换教师数据
+    const courses = teacherData.filter(row => row['任课教师'] && row['教学主题']).map(row => ({
+        teacher: row['任课教师'],
+        topic: row['教学主题'],
+        session: row['课时'],
+        courseStart: formatDate(row['开课日期']),
+        sessionStart: formatDate(row['起始日期']),
+        sessionEnd: formatDate(row['结束日期']),
+        courseEnd: formatDate(row['结课日期'])
+    }));
+    
+    // 处理学生数据
+    const students = [];
+    if (studentData.length > 0) {
+        // 创建一个学生记录
+        const student = {
+            id: "student_同学",
+            name: "同学",
+            studySessions: []
+        };
+        
+        // 添加学习记录
+        studentData.forEach((row, index) => {
+            if (!row['受课同学'] || !row['学习课程']) return;
+            
+            const studySession = {
+                id: `study_${index}`,
+                topic: row['学习课程'],
+                session: row['学习课时'],
+                startTime: formatDate(row['开始时间']),
+                endTime: formatDate(row['结束时间']),
+                // 添加默认值，您可以根据需要修改
+                duration: 0,
+                completed: false,
+                notes: ''
+            };
+            
+            // 计算时长（如果有日期）
+            if (studySession.startTime && studySession.endTime) {
+                const startDate = new Date(studySession.startTime);
+                const endDate = new Date(studySession.endTime);
+                // 计算天数差
+                const diffTime = Math.abs(endDate - startDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                studySession.duration = diffDays * 60; // 假设每天学习60分钟
+            }
+            
+            student.studySessions.push(studySession);
+        });
+        
+        students.push(student);
     }
     
-    // 处理教学主题
-    if (row['教学主题'] && String(row['教学主题']).trim() !== '') {
-      currentTopic = String(row['教学主题']).trim();
-    }
+    // 写入JSON文件
+    fs.writeFileSync('data.json', JSON.stringify(courses, null, 2));
+    console.log(`已生成 data.json 文件，包含 ${courses.length} 个教师课程记录`);
     
-    // 处理课程起止日期
-    const rowCourseStart = formatDate(row['开课日期']);
-    const rowCourseEnd = formatDate(row['结课日期']);
-    if (rowCourseStart && rowCourseEnd) {
-      currentCourseStart = rowCourseStart;
-      currentCourseEnd = rowCourseEnd;
-    }
+    fs.writeFileSync('students.json', JSON.stringify(students, null, 2));
+    console.log(`已生成 students.json 文件，包含 ${students.length} 个学生记录`);
     
-    // 处理课时起止日期
-    const sessionStart = formatDate(row['起始日期']);
-    const sessionEnd = formatDate(row['结束日期']);
-    
-    // 创建任务对象
-    if (currentTeacher && currentTopic && sessionStart && sessionEnd) {
-      const task = {
-        teacher: currentTeacher,
-        topic: currentTopic,
-        session: row['课时'] ? String(row['课时']).trim() : 'N/A',
-        courseStart: currentCourseStart,
-        courseEnd: currentCourseEnd,
-        sessionStart: sessionStart,
-        sessionEnd: sessionEnd
-      };
-      
-      processedTasks.push(task);
-    }
-  });
-  
-  // 写入JSON文件
-  fs.writeFileSync(outputFilePath, JSON.stringify(processedTasks, null, 2));
-  console.log(`成功生成data.json，包含${processedTasks.length}条记录`);
-
-} catch (error) {
-  console.error('处理Excel文件时出错:', error);
-  
-  // 创建一个空的数据文件
-  fs.writeFileSync(outputFilePath, JSON.stringify([], null, 2));
-  process.exit(1);
+    console.log('处理完成!');
 }
+
+// 格式化日期
+function formatDate(dateValue) {
+    if (!dateValue) return '';
+    
+    let date;
+    if (typeof dateValue === 'string') {
+        // 移除时间部分如果存在
+        const dateStr = dateValue.split(' ')[0];
+        date = new Date(dateStr);
+    } else {
+        date = new Date(dateValue);
+    }
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
+
+// 执行处理
+processExcel();
