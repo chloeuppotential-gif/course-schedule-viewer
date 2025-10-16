@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'schedule.xlsx'
+      - 'schedule-generator/schedule.xlsx'  # 修改点1：更新监控路径，正确指向schedule-generator目录下的Excel文件
   workflow_dispatch:
 
 permissions:
@@ -15,13 +15,21 @@ permissions:
 
 jobs:
   build-and-deploy:
-    # 这是正确的环境声明，只保留必须的 name
     environment:
       name: github-pages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # 修改点2：添加调试步骤，帮助诊断文件系统问题
+      - name: Debug filesystem
+        run: |
+          pwd
+          echo "仓库根目录内容:"
+          ls -la
+          echo "schedule-generator目录内容:"
+          ls -la schedule-generator/
 
       - name: Setup Node.js with Caching
         uses: actions/setup-node@v4
@@ -43,6 +51,8 @@ jobs:
           mkdir -p _site
           cp index.html _site/
           cp schedule-generator/data.json _site/
+          # 修改点3：添加students.json如果您的脚本也生成了这个文件
+          cp schedule-generator/students.json _site/ || echo "No students.json file found"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -55,5 +65,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        # 我们把 url 的获取放在它应该在的地方，而不是 job 的开头
-        # 并且，这个 action 会自动输出 URL，我们甚至不需要在这里显式处理
