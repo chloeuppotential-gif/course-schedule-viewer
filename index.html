@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 当前选择的用户
     let currentUser = users[0].id;
 
-    // 从 Firebase 加载检查状态 - 改为直接使用 taskCheckStatus 路径
+    // 从 Firebase 加载检查状态
     database.ref('taskCheckStatus').on('value', (snapshot) => {
         console.log("正在加载检查状态...");
         checkStatus = snapshot.val() || {};
@@ -674,9 +674,20 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function populateFilterDropdown(selectElement, options, currentlySelected) {
-        // 如果当前选择项不再可用，使用第一个选项
-        const finalSelection = options.includes(currentlySelected) ? currentlySelected : options[0];
+    // 修改的populateFilterDropdown函数
+    function populateFilterDropdown(selectElement, options, currentlySelected, defaultOption = null) {
+        // 确保默认选项（如'所有教师'）始终在第一位
+        if (defaultOption) {
+            // 先移除默认选项，以防它也在options中
+            const filteredOptions = options.filter(option => option !== defaultOption);
+            // 重建数组，默认选项在第一位
+            options = [defaultOption, ...filteredOptions];
+        }
+        
+        // 如果当前选择项不再可用，使用默认选项
+        const finalSelection = (options.includes(currentlySelected) && currentlySelected) 
+            ? currentlySelected 
+            : (defaultOption || options[0]);
         
         // 生成选项并设置选中项
         selectElement.innerHTML = options.map(option => 
@@ -684,6 +695,23 @@ document.addEventListener('DOMContentLoaded', function() {
         ).join('');
         
         return finalSelection;
+    }
+
+    // 正确比较课时数字的函数
+    function compareSessionNumbers(a, b) {
+        // 提取数字部分
+        const numA = a.match(/\d+/);
+        const numB = b.match(/\d+/);
+        
+        // 如果都有数字，按数字大小排序
+        if (numA && numB) {
+            return parseInt(numA[0], 10) - parseInt(numB[0], 10);
+        }
+        // 如果只有一个有数字，有数字的排在前面
+        else if (numA) return -1;
+        else if (numB) return 1;
+        // 如果都没有数字，按字母顺序排序
+        else return a.localeCompare(b);
     }
 
     function applyFilters() {
@@ -702,7 +730,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const dateStart = filterDateStart.value;
         const dateEnd = filterDateEnd.value;
         
-        // 记录已经应用的筛选条件，用于调试
         console.log("当前筛选条件:", {
             教师: currentSelectedTeacher,
             主题: currentSelectedTopic,
@@ -712,55 +739,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // ======== 1. 教师筛选选项 ========
-        // 如果选择了特定主题，只显示教授该主题的教师
         const teacherFilteredTasks = (currentSelectedTopic === '所有主题') 
             ? allTasks 
             : allTasks.filter(t => t.topic === currentSelectedTopic);
             
-        // 如果选择了特定课时，只显示教授该课时的教师
         const sessionFilteredTeachers = (currentSelectedSession === '所有课时')
             ? teacherFilteredTasks
             : teacherFilteredTasks.filter(t => t.session === currentSelectedSession);
             
-        const availableTeachers = ['所有教师', ...new Set(sessionFilteredTeachers.map(t => t.teacher))];
+        const uniqueTeachers = [...new Set(sessionFilteredTeachers.map(t => t.teacher))].sort();
         
         // ======== 2. 主题筛选选项 ========
-        // 如果选择了特定教师，只显示该教师教授的主题
         const topicFilteredTasks = (currentSelectedTeacher === '所有教师') 
             ? allTasks 
             : allTasks.filter(t => t.teacher === currentSelectedTeacher);
             
-        // 如果选择了特定课时，只显示该课时的主题
         const sessionFilteredTopics = (currentSelectedSession === '所有课时')
             ? topicFilteredTasks
             : topicFilteredTasks.filter(t => t.session === currentSelectedSession);
         
-        // 获取唯一的主题列表 - 修复重复主题问题
-        const availableTopics = ['所有主题', ...new Set(sessionFilteredTopics.map(t => t.topic))].sort();
+        const uniqueTopics = [...new Set(sessionFilteredTopics.map(t => t.topic))].sort();
         
         // ======== 3. 课时筛选选项 ========
-        // 获取符合当前教师和主题筛选条件的任务
         const tasksByTeacherAndTopic = allTasks.filter(t => {
             const teacherMatch = (currentSelectedTeacher === '所有教师' || t.teacher === currentSelectedTeacher);
             const topicMatch = (currentSelectedTopic === '所有主题' || t.topic === currentSelectedTopic);
             return teacherMatch && topicMatch;
         });
         
-        // 提取唯一的课时并按正确顺序排序
-        const allSessions = [...new Set(tasksByTeacherAndTopic.map(t => t.session))].filter(Boolean);
-        const sortedSessions = sortSessions(allSessions);
-        const availableSessions = ['所有课时', ...sortedSessions];
+        // 提取唯一的课时，确保没有重复项
+        const uniqueSessions = [...new Set(
+            tasksByTeacherAndTopic
+                .map(t => t.session)
+                .filter(Boolean) // 移除空值
+        )];
+        
+        // 正确排序课时
+        uniqueSessions.sort(compareSessionNumbers);
         
         // 填充筛选下拉框并获取最终选中的值
-        const finalSelectedTeacher = populateFilterDropdown(filterTeacher, availableTeachers, currentSelectedTeacher);
-        const finalSelectedTopic = populateFilterDropdown(filterTopic, availableTopics, currentSelectedTopic);
-        const finalSelectedSession = populateFilterDropdown(filterSession, availableSessions, currentSelectedSession);
+        const finalSelectedTeacher = populateFilterDropdown(filterTeacher, uniqueTeachers, currentSelectedTeacher, '所有教师');
+        const finalSelectedTopic = populateFilterDropdown(filterTopic, uniqueTopics, currentSelectedTopic, '所有主题');
+        const finalSelectedSession = populateFilterDropdown(filterSession, uniqueSessions, currentSelectedSession, '所有课时');
         
-        // 记录填充的选项，用于调试
         console.log("筛选选项:", {
-            可选教师: availableTeachers, 
-            可选主题: availableTopics,
-            可选课时: availableSessions
+            可选教师: ['所有教师', ...uniqueTeachers], 
+            可选主题: ['所有主题', ...uniqueTopics],
+            可选课时: ['所有课时', ...uniqueSessions]
         });
         
         // ======== 4. 应用所有筛选条件 ========
@@ -775,7 +800,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return teacherMatch && topicMatch && sessionMatch && dateMatch;
         });
         
-        // 记录筛选后的任务数量
         console.log(`筛选后剩余 ${tasksToRender.length} 个任务`);
         
         updateColors();
@@ -785,25 +809,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             renderCalendar(tasksToRender);
         }
-    }
-    
-    // 辅助函数：对课时进行智能排序
-    function sortSessions(sessions) {
-        return sessions.sort((a, b) => {
-            // 提取课时中的数字部分
-            const numA = a ? a.match(/\d+/) : null;
-            const numB = b ? b.match(/\d+/) : null;
-            
-            // 如果都有数字，按数字大小排序
-            if (numA && numB) {
-                return parseInt(numA[0], 10) - parseInt(numB[0], 10);
-            }
-            // 如果只有一个有数字，有数字的排在前面
-            else if (numA) return -1;
-            else if (numB) return 1;
-            // 如果都没有数字，按字母顺序排序
-            else return (a || '').localeCompare(b || '');
-        });
     }
     
     function updateColors() {
@@ -1246,7 +1251,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const sortedTeachers = Object.keys(groupedTasks).map(teacher => { 
             const tasks = groupedTasks[teacher]; 
-            tasks.sort((a, b) => parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime()); 
+            tasks.sort((a, b) => {
+                // 首先按主题排序
+                const topicCompare = a.topic.localeCompare(b.topic);
+                if (topicCompare !== 0) return topicCompare;
+                
+                // 如果主题相同，按课时排序
+                if (a.session && b.session) {
+                    return compareSessionNumbers(a.session, b.session);
+                }
+                
+                // 如果一个有课时一个没有，有课时的优先
+                if (a.session) return -1;
+                if (b.session) return 1;
+                
+                // 最后按开始日期排序
+                return parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime();
+            }); 
+            
             return { 
                 teacher, 
                 tasks, 
