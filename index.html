@@ -514,6 +514,15 @@ display: block; / 占整行，便于堆叠 */
         .filters-container .filter-group.hidden {
             display: none;
         }
+
+        /* 新增：纯文字日历注记样式（不影响现有色块与交互） */
+        .calendar-text-note {
+            font-size: 12px;
+            color: #555;
+            line-height: 1.3;
+            margin: 2px 0;
+            word-break: break-word;
+        }
     </style>
 </head>
 <body>
@@ -1622,6 +1631,60 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             addStudyInteractionListeners(session, marker);
                             endCell.appendChild(marker);
+                        }
+                    }
+                }
+            });
+        }
+
+        /* 新增功能：在对应日期格子顶部追加“教师名上/教师名下”的纯文字注记（无色块） */
+        if (currentViewMode !== 'student-only') {
+            // 去重，避免同一教师同一天重复标记
+            const startNotesSet = new Set();
+            const endNotesSet = new Set();
+
+            tasksToRender.forEach(task => {
+                // 只对课程起止范围进行注记（和上面的 marker 保持一致的月份范围）
+                const courseStartDate = new Date(task.courseStart + 'T00:00:00');
+                const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
+
+                // 起始
+                if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
+                    const key = `${task.teacher}-${task.courseStart}-start`;
+                    if (!startNotesSet.has(key)) {
+                        const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
+                        if (startCell) {
+                            const note = document.createElement('div');
+                            note.className = 'calendar-text-note';
+                            note.textContent = `${task.teacher}上`;
+                            // 插到日期数字后、其他 marker 之前：作为顶部文本提示
+                            const dayNum = startCell.querySelector('.day-number');
+                            if (dayNum && dayNum.nextSibling) {
+                                startCell.insertBefore(note, dayNum.nextSibling);
+                            } else {
+                                startCell.appendChild(note);
+                            }
+                            startNotesSet.add(key);
+                        }
+                    }
+                }
+
+                // 结束
+                if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
+                    const key = `${task.teacher}-${task.courseEnd}-end`;
+                    if (!endNotesSet.has(key)) {
+                        const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
+                        if (endCell) {
+                            const note = document.createElement('div');
+                            note.className = 'calendar-text-note';
+                            note.textContent = `${task.teacher}下`;
+                            const dayNum = endCell.querySelector('.day-number');
+                            if (dayNum && dayNum.nextSibling) {
+                                endCell.insertBefore(note, dayNum.nextSibling);
+                            } else {
+                                endCell.appendChild(note);
+                            }
+                            endNotesSet.add(key);
                         }
                     }
                 }
