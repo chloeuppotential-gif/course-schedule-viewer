@@ -1,596 +1,192 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>课程表</title>
-    <!-- 添加 Firebase SDK (使用CDN方式，适合GitHub Pages) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-    <style>
-        :root {
-            --primary-color: #3498db; --secondary-color: #2ecc71; --danger-color: #e74c3c;
-            --light-gray: #f4f7fa; --medium-gray: #e0e0e0; --dark-gray: #333;
-            --text-color: #333; --bg-color: #fff;
-            --header-bg: #f2f2f2;
-            --highlight-bg: #dcf4ff;
-            --dim-opacity: 0.4;
-            --today-bg: #fff2f2;
-            
-            /* 用户颜色 */
-            --user-chloe: #3498db;     /* 蓝色 */
-            --user-charlene: #f1c40f;  /* 黄色 */
-            --user-yeung: #2c3e50;     /* 黑色 */
-            
-            /* 学生颜色 - 改为蓝色系列 */
-            --student-color: #3498db;  /* 蓝色 */
-        }
-        html, body {
-            height: 100%;
-            margin: 0;
-            overflow: hidden; 
-        }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background-color: var(--light-gray); 
-            color: var(--text-color); 
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        .app-container { 
-            width: 100%;
-            height: 100%;
-            max-width: 1800px; 
-            margin: 0 auto; 
-            background-color: var(--bg-color); 
-            border-radius: 8px; 
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-        }
-        
-        .control-panel { 
-            padding: 15px 25px; 
-            border-bottom: 1px solid var(--medium-gray); 
-            background-color: #fdfdfd; 
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-shrink: 0;
-        }
-        .control-panel h2 { margin: 0; font-size: 1.2em; }
-        .view-switcher { margin-left: 20px; display: flex; gap: 5px; border: 1px solid #ccc; border-radius: 5px; padding: 2px; }
-        .view-switcher button { background: transparent; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-size: 0.9em; }
-        .view-switcher button.active { background-color: var(--primary-color); color: white; }
-        .control-panel .spacer { flex-grow: 1; }
-        #error-message { color: var(--danger-color); height: 1em; margin: 0; padding: 0 10px; }
-
-        /* 视图模式切换 */
-        .view-mode-selector {
-            display: flex;
-            gap: 10px;
-            margin-left: 20px;
-        }
-        
-        .view-mode-selector label {
-            display: flex;
-            align-items: center;
-            font-size: 0.85em;
-            cursor: pointer;
-        }
-        
-        .view-mode-selector input {
-            margin-right: 5px;
-        }
-
-        .filters-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; padding: 15px 25px; border-bottom: 1px solid var(--medium-gray); background-color: #f9fafb; flex-shrink: 0; }
-        .filters-container select, .filters-container input[type="date"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
-        .filters-container .date-filter-label { font-size: 0.9em; color: #555; }
-        #reset-filters-button { padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; cursor: pointer; }
-
-        .view-container { flex-grow: 1; overflow: auto; position: relative; }
-        .view { display: none; }
-        .view.active { display: flex; flex-direction: column; height: 100%; }
-
-        /* --- 甘特图样式 --- */
-        #gantt-view.active { display: flex; flex-direction: row; }
-        .gantt-chart { display: flex; align-items: flex-start; width: 100%; height: 100%; }
-        .gantt-tasks { flex-shrink: 0; width: 260px; border-right: 1px solid var(--medium-gray); background: #fdfdfd; position: sticky; left: 0; z-index: 20; }
-        .gantt-task-header { height: 80px; display: flex; align-items: center; justify-content: center; padding: 10px; border-bottom: 1px solid var(--medium-gray); font-weight: bold; box-sizing: border-box; position: sticky; top: 0; background: #fdfdfd; z-index: 21; }
-        .gantt-task-group-header, .gantt-task-item, .gantt-row { transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out; }
-        .gantt-task-group-header { height: 50px; padding: 0 15px; display: flex; align-items: center; border-bottom: 1px solid var(--medium-gray); font-weight: 600; background-color: var(--header-bg); box-sizing: border-box; cursor: pointer; }
-        .gantt-task-group-header .toggle-icon { margin-right: 8px; font-family: monospace; transition: transform 0.2s; display: inline-block; }
-        .gantt-task-group-header.collapsed .toggle-icon { transform: rotate(-90deg); }
-        .gantt-task-item { height: 50px; padding: 0 15px 0 30px; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid #f0f0f0; box-sizing: border-box; overflow: hidden; }
-        .task-topic { font-weight: 500; font-size: 0.9em; }
-        .task-session { font-size: 0.8em; color: #666; }
-        .gantt-grid { position: relative; display: flex; flex-direction: column; flex-grow: 1; }
-        .gantt-timeline { position: sticky; top: 0; z-index: 10; background: var(--bg-color); }
-        .gantt-months, .gantt-days { display: flex; }
-        
-        /* 修改日期单元格样式，增强边框 */
-        .gantt-month { 
-            height: 40px; 
-            font-size: 0.8em; 
-            flex-shrink: 0; 
-            box-sizing: border-box; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            border-right: 1px solid var(--medium-gray); 
-            border-bottom: 1px solid var(--medium-gray); 
-            font-weight: bold; 
-        }
-        
-        .gantt-day { 
-            height: 40px; 
-            width: 40px; 
-            font-size: 0.75em; 
-            flex-shrink: 0; 
-            box-sizing: border-box; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            border-right: 1px solid var(--medium-gray); 
-            border-bottom: 1px solid var(--medium-gray); 
-            font-weight: bold; 
-            position: relative;
-            background-color: #fdfdfd;
-        }
-        
-        /* 添加左边框给第一个日期单元格 */
-        .gantt-days .gantt-day:first-child {
-            border-left: 1px solid var(--medium-gray);
-        }
-        
-        /* 甘特图行区域显示网格背景 */
-        .gantt-rows { 
-            position: relative;
-            background-color: white;
-            background-image: 
-                linear-gradient(to right, var(--medium-gray) 1px, transparent 1px);
-            background-size: 40px 100%;
-            background-position: 0 0;
-        }
-        
-        /* 修改折叠样式，改为完全不占用空间 */
-        .gantt-row { 
-            height: 50px; 
-            box-sizing: border-box; 
-            border-bottom: 1px solid #f0f0f0; 
-            overflow: hidden;
-            position: relative;
-            background: transparent; /* 改为透明背景以显示网格线 */
-        }
-        
-        .gantt-row.group-header-row { 
-            background-color: var(--header-bg); 
-            border-bottom: 1px solid var(--medium-gray); 
-        }
-        
-        /* 重要：使用display:none完全移出布局流 */
-        .gantt-row.collapsed, 
-        .gantt-task-item.collapsed,
-        .gantt-bar.collapsed { 
-            display: none !important;
-        }
-
-        /* 改进网格线样式，提高可见性 */
-        .gantt-grid-lines { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            z-index: 0; 
-            pointer-events: none; 
-        }
-        
-        .gantt-grid-line { 
-            position: absolute; 
-            top: 0; 
-            bottom: 0; 
-            width: 0; /* 确保线条宽度为0，只显示边框 */
-            border-left: 1px dashed var(--medium-gray); 
-            z-index: 1;
-            opacity: 1; /* 确保不透明 */
-            pointer-events: none;
-        }
-        
-        .gantt-bar { 
-            box-sizing: border-box; 
-            position: absolute; 
-            border-radius: 4px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 0 10px; 
-            color: white; 
-            font-size: 0.8em; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            cursor: pointer; 
-            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s 0.2s; 
-        }
-        .gantt-task-item.highlight, .gantt-row.highlight, .gantt-task-group-header.highlight { background-color: var(--highlight-bg) !important; }
-        
-        .gantt-chart.is-hovering .gantt-bar:not(.is-hovered) { opacity: var(--dim-opacity) !important; }
-        
-        .gantt-bar-course { height: 30px; top: 10px; opacity: 0.3; z-index: 1; border: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; padding: 0 5px; }
-        .gantt-bar-course-label { font-size: 0.7em; color: #444; font-weight: 600; }
-        .gantt-bar-course-text { font-weight: bold; font-size: 0.8em; transition: opacity 0.2s ease-in-out; opacity: 0; color: var(--dark-gray); }
-
-        .gantt-bar-session { height: 22px; top: 14px; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .gantt-bar-session::before { content: ''; position: absolute; top: -14px; bottom: -14px; left: 0; right: 0; background: transparent; z-index: 1; }
-
-        .gantt-bar-session.is-hovered { transform: scale(1.05); z-index: 16; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
-
-        .gantt-bar-course.is-hovered {
-            opacity: 0.9 !important;
-            transform: scale(1.02);
-            z-index: 17;
-            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, z-index 0s;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        .gantt-bar-course.is-hovered .gantt-bar-course-text { opacity: 1; }
-        
-        /* 学生学习时间样式 - 修改为蓝色 */
-        .gantt-bar-student {
-            height: 16px;
-            top: 18px;
-            z-index: 3;
-            background-color: var(--student-color);
-            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.1) 5px, rgba(255,255,255,0) 5px, rgba(255,255,255,0) 10px);
-            border: 1px solid rgba(0,0,0,0.2);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .gantt-bar-student.completed {
-            background-image: none;
-            background-color: #2980b9; /* 深蓝色表示完成 */
-        }
-        
-        .gantt-bar-student.is-hovered { 
-            transform: scale(1.05); 
-            z-index: 18; 
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        
-        /* 学生学习时间日历标记 - 修改为蓝色 */
-        .calendar-marker.student-marker {
-            background-color: var(--student-color);
-            border-radius: 12px;
-            font-style: italic;
-        }
-        
-        .calendar-marker.student-marker.completed {
-            background-color: #2980b9; /* 深蓝色表示完成 */
-        }
-        
-        .gantt-today-line { 
-            position: absolute; 
-            top: 0; 
-            bottom: 0; 
-            width: 2px; 
-            background-color: var(--danger-color); 
-            z-index: 5; 
-            display: none; 
-        }
-        
-        /* 增强今日线样式 */
-        .gantt-today-line::after {
-            content: '今天';
-            position: absolute;
-            top: 5px;
-            left: -15px;
-            background-color: var(--danger-color);
-            color: white;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-size: 0.75em;
-            white-space: nowrap;
-        }
-
-        /* --- 日历视图样式 --- */
-        #calendar-view { flex-direction: column; padding: 15px 25px; box-sizing: border-box; }
-        .calendar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; position: relative; min-height: 70px; }
-        .calendar-header h3 { margin: 0; font-size: 1.5em; }
-        .calendar-nav { position: absolute; left: 0; display: flex; gap: 10px; }
-        .calendar-nav button { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; cursor: pointer; }
-        .calendar-grid-container { flex-grow: 1; display: grid; grid-template-rows: auto 1fr; }
-        .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; color: #666; padding-bottom: 10px; border-bottom: 1px solid var(--medium-gray); }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(140px, auto); border-left: 1px solid var(--medium-gray); }
-        .calendar-day { border-right: 1px solid var(--medium-gray); border-bottom: 1px solid var(--medium-gray); padding: 5px; overflow-y: auto; position: relative; }
-        .calendar-day.other-month .day-number { color: #ccc; }
-        .calendar-day.today { background-color: var(--today-bg); }
-        .day-number { font-weight: 500; margin-bottom: 5px; }
-        .calendar-day.today .day-number { color: var(--danger-color); font-weight: bold; }
-        .calendar-marker {
-font-size: 0.8em;
-padding: 6px 8px; /* 稍微增大内边距提升可读性 /
-border-radius: 6px; / 圆角略大 /
-margin-bottom: 6px; / 每条之间留些距离 /
-color: white;
-white-space: normal; / 允许换行 /
-overflow: visible; / 不截断 /
-word-break: break-word; / 长词也可换行 /
-cursor: pointer;
-display: block; / 占整行，便于堆叠 */
-}
-        .marker-start { background-color: #27ae60; }
-        .marker-end { background-color: #c0392b; }
-        .marker-single-day { background-color: #3498db; }
-        
-        /* 信息老师专用颜色样式 - 修改为紫色系列 */
-        .calendar-marker.marker-info-teacher {
-            background-color: #9b59b6; /* 中等紫色 */
-            color: white;
-        }
-        
-        .calendar-marker.marker-info-start {
-            background-color: #6c3483; /* 深紫色 */
-            color: white;
-        }
-        
-        .calendar-marker.marker-info-end {
-            background-color: #c39bd3; /* 浅紫色 */
-            color: #333; /* 深色文字，提高可读性 */
-        }
-
-        /* 多用户选择器和任务检查样式 */
-        .user-selector {
-            position: fixed;
-            top: 75px; 
-            right: 20px;
-            background: white;
-            padding: 8px;
-            border-radius: 5px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            z-index: 1000;
-            font-size: 0.8em; /* 更小的字体 */
-            max-width: 200px;
-        }
-        
-        .user-option {
-            display: flex;
-            align-items: center;
-            margin-bottom: 3px;
-        }
-        
-        .user-color {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 6px;
-        }
-        
-        .user-selector-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 0.85em;
-        }
-        
-        .user-selector-legend {
-            margin-top: 5px;
-            font-size: 0.75em;
-            color: #666;
-        }
-        
-        .user-chloe { background-color: var(--user-chloe); }
-        .user-charlene { background-color: var(--user-charlene); }
-        .user-yeung { background-color: var(--user-yeung); }
-        
-        /* 任务复选框样式改进 */
-        .multi-checkbox {
-            display: flex;
-            gap: 2px;
-            margin-right: 4px;
-        }
-        
-        .checkbox-container {
-            width: 14px;
-            height: 14px;
-            position: relative;
-        }
-        
-        .user-checkbox {
-            width: 14px;
-            height: 14px;
-            cursor: pointer;
-            position: absolute;
-            top: 0;
-            left: 0;
-            opacity: 0;
-            margin: 0;
-            z-index: 2;
-        }
-        
-        .checkbox-display {
-            width: 14px;
-            height: 14px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            background: white;
-            position: absolute;
-            top: 0;
-            left: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
-            z-index: 1;
-        }
-        
-        .user-checkbox:checked + .checkbox-display.chloe::before {
-            content: '✓';
-            color: var(--user-chloe);
-        }
-        
-        .user-checkbox:checked + .checkbox-display.charlene::before {
-            content: '✓';
-            color: var(--user-charlene);
-        }
-        
-        .user-checkbox:checked + .checkbox-display.yeung::before {
-            content: '✓';
-            color: var(--user-yeung);
-        }
-
-        .task-feedback {
-            position: absolute;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 0.8em;
-            z-index: 100;
-            top: -5px;
-            right: 5px;
-        }
-        
-        .task-feedback.chloe {
-            background-color: var(--user-chloe);
-        }
-        
-        .task-feedback.charlene {
-            background-color: var(--user-charlene);
-            color: black; /* 黄色背景配黑色文字更易读 */
-        }
-        
-        .task-feedback.yeung {
-            background-color: var(--user-yeung);
-        }
-
-        .empty-state { display: flex; justify-content: center; align-items: center; width: 100%; height: 150px; color: #999; }
-        .tooltip { position: fixed; background-color: rgba(0, 0, 0, 0.8); color: white; padding: 10px 15px; border-radius: 5px; font-size: 0.9em; z-index: 100; pointer-events: none; opacity: 0; transform: translate(-50%, -100%); transition: opacity 0.1s ease; white-space: nowrap; }
-        .tooltip.visible { opacity: 1; }
-        .tooltip-row { display: flex; justify-content: space-between; padding: 2px 0; }
-        .tooltip-label { font-weight: bold; margin-right: 15px; }
-        .tooltip-value { color: #ddd; }
-        
-        /* 添加过渡动画 */
-        .fade-out {
-            opacity: 0;
-            transition: opacity 0.2s ease-out;
-        }
-        
-        .fade-in {
-            opacity: 0;
-            animation: fadeIn 0.3s ease-in forwards;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        /* 添加页脚样式 */
-        .footer {
-            text-align: center;
-            padding: 10px;
-            font-size: 0.8em;
-            color: #888;
-            border-top: 1px solid var(--medium-gray);
-        }
-
-        /* 新增：筛选器标签样式 */
-        .filter-label {
-            font-size: 0.85em;
-            font-weight: 600;
-            color: #555;
-            margin-right: 5px;
-        }
-        
-        /* 隐藏筛选器的样式 */
-        .filters-container .filter-group {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .filters-container .filter-group.hidden {
-            display: none;
-        }
-
-        /* 新增：纯文字日历注记样式（不影响现有色块与交互） */
-        .calendar-text-note {
-            font-size: 12px;
-            color: #555;
-            line-height: 1.3;
-            margin: 2px 0;
-            word-break: break-word;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>课程表</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <style>
+    :root{
+      --primary-color:#3498db;--secondary-color:#2ecc71;--danger-color:#e74c3c;
+      --light-gray:#f4f7fa;--medium-gray:#e0e0e0;--dark-gray:#333;
+      --text-color:#333;--bg-color:#fff;--header-bg:#f2f2f2;--highlight-bg:#dcf4ff;--dim-opacity:.4;--today-bg:#fff2f2;
+      --user-chloe:#3498db;--user-charlene:#f1c40f;--user-yeung:#2c3e50;
+      --student-color:#3498db;
+    }
+    html,body{height:100%;margin:0;overflow:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background-color:var(--light-gray);color:var(--text-color);padding:10px;box-sizing:border-box}
+    .app-container{width:100%;height:100%;max-width:1800px;margin:0 auto;background-color:var(--bg-color);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);overflow:hidden;display:flex;flex-direction:column}
+    .control-panel{padding:15px 25px;border-bottom:1px solid var(--medium-gray);background-color:#fdfdfd;display:flex;align-items:center;gap:15px;flex-shrink:0}
+    .control-panel h2{margin:0;font-size:1.2em}
+    .view-switcher{margin-left:20px;display:flex;gap:5px;border:1px solid #ccc;border-radius:5px;padding:2px}
+    .view-switcher button{background:transparent;border:none;padding:6px 12px;cursor:pointer;border-radius:4px;font-size:.9em}
+    .view-switcher button.active{background-color:var(--primary-color);color:#fff}
+    .control-panel .spacer{flex-grow:1}
+    #error-message{color:var(--danger-color);height:1em;margin:0;padding:0 10px}
+    .view-mode-selector{display:flex;gap:10px;margin-left:20px}
+    .view-mode-selector label{display:flex;align-items:center;font-size:.85em;cursor:pointer}
+    .view-mode-selector input{margin-right:5px}
+    .filters-container{display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding:15px 25px;border-bottom:1px solid var(--medium-gray);background-color:#f9fafb;flex-shrink:0}
+    .filters-container select,.filters-container input[type="date"]{padding:8px 12px;border:1px solid #ccc;border-radius:4px}
+    .filters-container .date-filter-label{font-size:.9em;color:#555}
+    #reset-filters-button{padding:8px 16px;border:1px solid #ccc;border-radius:4px;background-color:#fff;cursor:pointer}
+    .view-container{flex-grow:1;overflow:auto;position:relative}
+    .view{display:none}
+    .view.active{display:flex;flex-direction:column;height:100%}
+    /* 甘特图 */
+    #gantt-view.active{display:flex;flex-direction:row}
+    .gantt-chart{display:flex;align-items:flex-start;width:100%;height:100%}
+    .gantt-tasks{flex-shrink:0;width:260px;border-right:1px solid var(--medium-gray);background:#fdfdfd;position:sticky;left:0;z-index:20}
+    .gantt-task-header{height:80px;display:flex;align-items:center;justify-content:center;padding:10px;border-bottom:1px solid var(--medium-gray);font-weight:bold;box-sizing:border-box;position:sticky;top:0;background:#fdfdfd;z-index:21}
+    .gantt-task-group-header,.gantt-task-item,.gantt-row{transition:opacity .2s ease-in-out,background-color .2s ease-in-out}
+    .gantt-task-group-header{height:50px;padding:0 15px;display:flex;align-items:center;border-bottom:1px solid var(--medium-gray);font-weight:600;background-color:var(--header-bg);box-sizing:border-box;cursor:pointer}
+    .gantt-task-group-header .toggle-icon{margin-right:8px;font-family:monospace;transition:transform .2s;display:inline-block}
+    .gantt-task-group-header.collapsed .toggle-icon{transform:rotate(-90deg)}
+    .gantt-task-item{height:50px;padding:0 15px 0 30px;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid #f0f0f0;box-sizing:border-box;overflow:hidden}
+    .task-topic{font-weight:500;font-size:.9em}
+    .task-session{font-size:.8em;color:#666}
+    .gantt-grid{position:relative;display:flex;flex-direction:column;flex-grow:1}
+    .gantt-timeline{position:sticky;top:0;z-index:10;background:var(--bg-color)}
+    .gantt-months,.gantt-days{display:flex}
+    .gantt-month{height:40px;font-size:.8em;flex-shrink:0;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--medium-gray);border-bottom:1px solid var(--medium-gray);font-weight:bold}
+    .gantt-day{height:40px;width:40px;font-size:.75em;flex-shrink:0;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--medium-gray);border-bottom:1px solid var(--medium-gray);font-weight:bold;position:relative;background-color:#fdfdfd}
+    .gantt-days .gantt-day:first-child{border-left:1px solid var(--medium-gray)}
+    .gantt-rows{position:relative;background-color:#fff;background-image:linear-gradient(to right,var(--medium-gray) 1px,transparent 1px);background-size:40px 100%;background-position:0 0}
+    .gantt-row{height:50px;box-sizing:border-box;border-bottom:1px solid #f0f0f0;overflow:hidden;position:relative;background:transparent}
+    .gantt-row.group-header-row{background-color:var(--header-bg);border-bottom:1px solid var(--medium-gray)}
+    .gantt-row.collapsed,.gantt-task-item.collapsed,.gantt-bar.collapsed{display:none!important}
+    .gantt-grid-lines{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+    .gantt-grid-line{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--medium-gray);z-index:1;opacity:1;pointer-events:none}
+    .gantt-bar{box-sizing:border-box;position:absolute;border-radius:4px;display:flex;align-items:center;justify-content:center;padding:0 10px;color:#fff;font-size:.8em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:opacity .2s ease-in-out,transform .2s ease-in-out,box-shadow .2s ease-in-out,z-index 0s .2s}
+    .gantt-task-item.highlight,.gantt-row.highlight,.gantt-task-group-header.highlight{background-color:var(--highlight-bg)!important}
+    .gantt-chart.is-hovering .gantt-bar:not(.is-hovered){opacity:var(--dim-opacity)!important}
+    .gantt-bar-course{height:30px;top:10px;opacity:.3;z-index:1;border:1px solid rgba(0,0,0,.1);display:flex;justify-content:space-between;align-items:center;padding:0 5px}
+    .gantt-bar-course-label{font-size:.7em;color:#444;font-weight:600}
+    .gantt-bar-course-text{font-weight:bold;font-size:.8em;transition:opacity .2s ease-in-out;opacity:0;color:#333}
+    .gantt-bar-session{height:22px;top:14px;z-index:2;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+    .gantt-bar-session::before{content:'';position:absolute;top:-14px;bottom:-14px;left:0;right:0;background:transparent;z-index:1}
+    .gantt-bar-session.is-hovered{transform:scale(1.05);z-index:16;box-shadow:0 5px 15px rgba(0,0,0,.3)}
+    .gantt-bar-course.is-hovered{opacity:.9!important;transform:scale(1.02);z-index:17;transition:opacity .2s ease-in-out,transform .2s ease-in-out,box-shadow .2s ease-in-out,z-index 0s;box-shadow:0 5px 15px rgba(0,0,0,.3)}
+    .gantt-bar-student{height:16px;top:18px;z-index:3;background-color:var(--student-color);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.1),rgba(255,255,255,.1) 5px,rgba(255,255,255,0) 5px,rgba(255,255,255,0) 10px);border:1px solid rgba(0,0,0,.2)}
+    .gantt-bar-student.completed{background-image:none;background-color:#2980b9}
+    .gantt-bar-student.is-hovered{transform:scale(1.05)}
+    /* 日历 */
+    #calendar-view{flex-direction:column;padding:15px 25px;box-sizing:border-box}
+    .calendar-header{display:flex;align-items:center;justify-content:center;margin-bottom:15px;position:relative;min-height:70px}
+    .calendar-header h3{margin:0;font-size:1.5em}
+    .calendar-nav{position:absolute;left:0;display:flex;gap:10px}
+    .calendar-nav button{padding:6px 12px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer}
+    .calendar-grid-container{flex-grow:1;display:grid;grid-template-rows:auto 1fr}
+    .calendar-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-weight:bold;color:#666;padding-bottom:10px;border-bottom:1px solid var(--medium-gray)}
+    .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:minmax(140px,auto);border-left:1px solid var(--medium-gray)}
+    .calendar-day{border-right:1px solid var(--medium-gray);border-bottom:1px solid var(--medium-gray);padding:5px;overflow-y:auto;position:relative}
+    .calendar-day.other-month .day-number{color:#ccc}
+    .calendar-day.today{background-color:var(--today-bg)}
+    .day-number{font-weight:500;margin-bottom:5px}
+    .calendar-day.today .day-number{color:var(--danger-color);font-weight:bold}
+    .calendar-marker{font-size:.8em;padding:6px 8px;border-radius:6px;margin-bottom:6px;color:#fff;white-space:normal;overflow:visible;word-break:break-word;cursor:pointer;display:block}
+    .marker-start{background-color:#27ae60}
+    .marker-end{background-color:#c0392b}
+    .marker-single-day{background-color:#3498db}
+    .calendar-marker.marker-info-teacher{background-color:#9b59b6;color:#fff}
+    .calendar-marker.marker-info-start{background-color:#6c3483;color:#fff}
+    .calendar-marker.marker-info-end{background-color:#c39bd3;color:#333}
+    .user-selector{position:fixed;top:75px;right:20px;background:#fff;padding:8px;border-radius:5px;box-shadow:0 2px 8px rgba(0,0,0,.1);z-index:1000;font-size:.8em;max-width:200px}
+    .user-option{display:flex;align-items:center;margin-bottom:3px}
+    .user-color{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px}
+    .user-selector-title{font-weight:bold;margin-bottom:5px;font-size:.85em}
+    .user-selector-legend{margin-top:5px;font-size:.75em;color:#666}
+    .user-chloe{background-color:var(--user-chloe)}
+    .user-charlene{background-color:var(--user-charlene)}
+    .user-yeung{background-color:var(--user-yeung)}
+    .multi-checkbox{display:flex;gap:2px;margin-right:4px}
+    .checkbox-container{width:14px;height:14px;position:relative}
+    .user-checkbox{width:14px;height:14px;cursor:pointer;position:absolute;top:0;left:0;opacity:0;margin:0;z-index:2}
+    .checkbox-display{width:14px;height:14px;border:1px solid #ccc;border-radius:3px;background:#fff;position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;z-index:1}
+    .user-checkbox:checked + .checkbox-display.chloe::before{content:'✓';color:var(--user-chloe)}
+    .user-checkbox:checked + .checkbox-display.charlene::before{content:'✓';color:var(--user-charlene)}
+    .user-checkbox:checked + .checkbox-display.yeung::before{content:'✓';color:var(--user-yeung)}
+    .task-feedback{position:absolute;color:#fff;padding:3px 8px;border-radius:3px;font-size:.8em;z-index:100;top:-5px;right:5px}
+    .task-feedback.chloe{background-color:var(--user-chloe)}
+    .task-feedback.charlene{background-color:var(--user-charlene);color:#000}
+    .task-feedback.yeung{background-color:var(--user-yeung)}
+    .empty-state{display:flex;justify-content:center;align-items:center;width:100%;height:150px;color:#999}
+    .tooltip{position:fixed;background-color:rgba(0,0,0,.8);color:#fff;padding:10px 15px;border-radius:5px;font-size:.9em;z-index:100;pointer-events:none;opacity:0;transform:translate(-50%,-100%);transition:opacity .1s ease;white-space:nowrap}
+    .tooltip.visible{opacity:1}
+    .tooltip-row{display:flex;justify-content:space-between;padding:2px 0}
+    .tooltip-label{font-weight:bold;margin-right:15px}
+    .tooltip-value{color:#ddd}
+    .fade-out{opacity:0;transition:opacity .2s ease-out}
+    .fade-in{opacity:0;animation:fadeIn .3s ease-in forwards}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .footer{text-align:center;padding:10px;font-size:.8em;color:#888;border-top:1px solid var(--medium-gray)}
+    .filter-label{font-size:.85em;font-weight:600;color:#555;margin-right:5px}
+    .filters-container .filter-group{display:flex;align-items:center;gap:5px}
+    .filters-container .filter-group.hidden{display:none}
+    /* 新增：纯文字注记 */
+    .calendar-text-note{font-size:12px;color:#555;line-height:1.3;margin:2px 0;word-break:break-word}
+    @media (max-width: 640px){
+      .gantt-tasks{width:180px}
+      .calendar-grid{grid-auto-rows:minmax(120px,auto)}
+      .control-panel,.filters-container{padding:10px}
+      .view-switcher button{padding:6px 8px}
+    }
+  </style>
 </head>
 <body>
-
-<div class="app-container">
+  <div class="app-container">
     <div class="control-panel">
-        <h2>课程表</h2>
-        <div class="view-switcher">
-            <button id="gantt-view-btn" class="active">甘特图</button>
-            <button id="calendar-view-btn">日历</button>
-        </div>
-        
-        <!-- 添加视图模式切换 -->
-        <div class="view-mode-selector">
-            <label><input type="radio" name="view-mode" value="all" checked> 所有数据</label>
-            <label><input type="radio" name="view-mode" value="teacher-only"> 仅教师课程</label>
-            <label><input type="radio" name="view-mode" value="student-only"> 仅学生学习</label>
-        </div>
-        
-        <div class="spacer"></div>
-        <p id="error-message">正在加载数据...</p>
+      <h2>课程表</h2>
+      <div class="view-switcher">
+        <button id="gantt-view-btn" class="active">甘特图</button>
+        <button id="calendar-view-btn">日历</button>
+      </div>
+      <div class="view-mode-selector">
+        <label><input type="radio" name="view-mode" value="all" checked> 所有数据</label>
+        <label><input type="radio" name="view-mode" value="teacher-only"> 仅教师课程</label>
+        <label><input type="radio" name="view-mode" value="student-only"> 仅学生学习</label>
+      </div>
+      <div class="spacer"></div>
+      <p id="error-message">正在加载数据...</p>
     </div>
     <div class="filters-container">
-        <div class="filter-group" id="teacher-filter-group">
-            <span class="filter-label">教师:</span>
-            <select id="filter-teacher"></select>
-        </div>
-        
-        <div class="filter-group" id="student-filter-group">
-            <span class="filter-label">学生:</span>
-            <select id="filter-student"></select>
-        </div>
-        
-        <span class="filter-label">主题:</span>
-        <select id="filter-topic"></select>
-        
-        <span class="filter-label">课时:</span>
-        <select id="filter-session"></select>
-        
-        <span class="filter-label">日期范围:</span>
-        <input type="date" id="filter-date-start">
-        <span class="date-filter-label">至</span>
-        <input type="date" id="filter-date-end">
-        <button id="reset-filters-button">重置筛选</button>
+      <div class="filter-group" id="teacher-filter-group">
+        <span class="filter-label">教师:</span>
+        <select id="filter-teacher"></select>
+      </div>
+      <div class="filter-group" id="student-filter-group">
+        <span class="filter-label">学生:</span>
+        <select id="filter-student"></select>
+      </div>
+      <span class="filter-label">主题:</span>
+      <select id="filter-topic"></select>
+      <span class="filter-label">课时:</span>
+      <select id="filter-session"></select>
+      <span class="filter-label">日期范围:</span>
+      <input type="date" id="filter-date-start" />
+      <span class="date-filter-label">至</span>
+      <input type="date" id="filter-date-end" />
+      <button id="reset-filters-button">重置筛选</button>
     </div>
     <div class="view-container">
-        <div id="gantt-view" class="view active">
-            <div class="gantt-chart">
-                <div class="gantt-tasks"></div>
-                <div class="gantt-grid"></div>
-            </div>
+      <div id="gantt-view" class="view active">
+        <div class="gantt-chart">
+          <div class="gantt-tasks"></div>
+          <div class="gantt-grid"></div>
         </div>
-        <div id="calendar-view" class="view">
-            <!-- 日历视图将由JS动态生成 -->
-        </div>
+      </div>
+      <div id="calendar-view" class="view"></div>
     </div>
     <div class="footer">
-        数据最后更新: <span id="last-updated-time"></span> | 当前时间: <span id="current-time"></span>
+      数据最后更新: <span id="last-updated-time"></span> | 当前时间: <span id="current-time"></span>
     </div>
-</div>
-<div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("正在运行课程表...");
-
-    // Firebase 初始化
-    const firebaseConfig = {
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const firebaseConfig = {
         apiKey: "AIzaSyDL5vla4WJlGY51fg3ZTODeqnKRxEMUbNU",
         authDomain: "course-schedule-check.firebaseapp.com",
         databaseURL: "https://course-schedule-check-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -599,142 +195,104 @@ document.addEventListener('DOMContentLoaded', function() {
         messagingSenderId: "104017045221",
         appId: "1:104017045221:web:bd2cbb7135a23df514d60c",
         measurementId: "G-07S6SE764S"
-    };
+      };
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+      let checkStatus = {};
 
-    // 初始化 Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    let checkStatus = {};
+      const users = [
+        { id: 'chloe', name: 'Chloe', color: '#3498db' },
+        { id: 'charlene', name: 'Charlene', color: '#f1c40f' },
+        { id: 'yeung', name: 'Mrs. Yeung', color: '#2c3e50' }
+      ];
+      let currentUser = users[0].id;
 
-    // 定义用户
-    const users = [
-        { id: 'chloe', name: 'Chloe', color: '#3498db' },  // 蓝色
-        { id: 'charlene', name: 'Charlene', color: '#f1c40f' }, // 黄色
-        { id: 'yeung', name: 'Mrs. Yeung', color: '#2c3e50' }  // 黑色
-    ];
-    
-    // 当前选择的用户
-    let currentUser = users[0].id;
-
-    // 从 Firebase 加载检查状态
-    database.ref('taskCheckStatus').on('value', (snapshot) => {
-        console.log("正在加载检查状态...");
+      database.ref('taskCheckStatus').on('value', (snapshot) => {
         checkStatus = snapshot.val() || {};
-        console.log("已从Firebase加载状态:", checkStatus);
-        
-        // 如果当前在日历视图，重新渲染以更新复选框状态
-        if (currentView === 'calendar') {
-            applyFilters();
-        }
-    });
+        if (currentView === 'calendar') applyFilters();
+      });
 
-    // 保存检查状态到 Firebase 的函数
-    function saveMultiUserCheckStatus(taskId, userId, isChecked) {
-        console.log("正在保存状态:", taskId, userId, isChecked);
-        
+      function saveMultiUserCheckStatus(taskId, userId, isChecked) {
         const path = `taskCheckStatus/${taskId}/${userId}`;
-        
-        database.ref(path).set(isChecked)
-            .then(() => {
-                console.log("状态成功保存到:", path);
-            })
-            .catch(error => {
-                console.error("保存状态失败:", error);
-                errorMessage.textContent = `保存失败: ${error.message}`;
-                setTimeout(() => {
-                    errorMessage.textContent = '';
-                }, 3000);
-            });
-    }
-
-    // 显示保存反馈
-    function showFeedback(element, userId) {
+        database.ref(path).set(isChecked).catch(error => {
+          errorMessage.textContent = `保存失败: ${error.message}`;
+          setTimeout(() => (errorMessage.textContent = ''), 3000);
+        });
+      }
+      function showFeedback(element, userId) {
         const feedback = document.createElement('div');
         feedback.className = `task-feedback ${userId}`;
         feedback.textContent = '✓ 已保存';
         element.appendChild(feedback);
-        
-        setTimeout(() => {
-            feedback.remove();
-        }, 1500);
-    }
+        setTimeout(() => feedback.remove(), 1500);
+      }
 
-    let allTasks = [];       // 教师课程数据
-    let students = [];       // 学生数据
-    const topicColors = {};
-    const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#e84393', '#0984e3', '#6c5ce7', '#00b894'];
-    let dayWidth = 40;
-    const collapsedGroups = new Set();
-    let currentViewMode = 'all';  // 当前视图模式：all, teacher-only, student-only
+      let allTasks = [];
+      let students = [];
+      const topicColors = {};
+      const colors = ['#3498db','#e74c3c','#2ecc71','#f1c40f','#9b59b6','#1abc9c','#34495e','#e67e22','#e84393','#0984e3','#6c5ce7','#00b894'];
+      let dayWidth = 40;
+      const collapsedGroups = new Set();
+      let currentViewMode = 'all';
+      let currentView = 'gantt';
+      let currentDisplayDate = new Date();
 
-    let currentView = 'gantt';
-    let currentDisplayDate = new Date(); // 默认显示今天
+      const errorMessage = document.getElementById('error-message');
+      const ganttView = document.getElementById('gantt-view');
+      const calendarView = document.getElementById('calendar-view');
+      const ganttTasksContainer = ganttView.querySelector('.gantt-tasks');
+      const ganttGrid = ganttView.querySelector('.gantt-grid');
 
-    const errorMessage = document.getElementById('error-message');
-    
-    const ganttView = document.getElementById('gantt-view');
-    const calendarView = document.getElementById('calendar-view');
-    const ganttTasksContainer = ganttView.querySelector('.gantt-tasks');
-    const ganttGrid = ganttView.querySelector('.gantt-grid');
+      const filterTeacher = document.getElementById('filter-teacher');
+      const filterStudent = document.getElementById('filter-student');
+      const filterTopic = document.getElementById('filter-topic');
+      const filterSession = document.getElementById('filter-session');
+      const tooltip = document.getElementById('tooltip');
+      const filterDateStart = document.getElementById('filter-date-start');
+      const filterDateEnd = document.getElementById('filter-date-end');
+      const resetFiltersButton = document.getElementById('reset-filters-button');
+      const ganttViewBtn = document.getElementById('gantt-view-btn');
+      const calendarViewBtn = document.getElementById('calendar-view-btn');
+      const lastUpdatedTimeElement = document.getElementById('last-updated-time');
+      const currentTimeElement = document.getElementById('current-time');
+      const teacherFilterGroup = document.getElementById('teacher-filter-group');
+      const studentFilterGroup = document.getElementById('student-filter-group');
 
-    const filterTeacher = document.getElementById('filter-teacher');
-    const filterStudent = document.getElementById('filter-student');
-    const filterTopic = document.getElementById('filter-topic');
-    const filterSession = document.getElementById('filter-session');
-    const tooltip = document.getElementById('tooltip');
-
-    const filterDateStart = document.getElementById('filter-date-start');
-    const filterDateEnd = document.getElementById('filter-date-end');
-    const resetFiltersButton = document.getElementById('reset-filters-button');
-    
-    const ganttViewBtn = document.getElementById('gantt-view-btn');
-    const calendarViewBtn = document.getElementById('calendar-view-btn');
-    
-    const lastUpdatedTimeElement = document.getElementById('last-updated-time');
-    const currentTimeElement = document.getElementById('current-time');
-    
-    // 筛选器组元素
-    const teacherFilterGroup = document.getElementById('teacher-filter-group');
-    const studentFilterGroup = document.getElementById('student-filter-group');
-    
-    // 添加视图模式选择监听
-    document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            currentViewMode = this.value;
-            updateFilterVisibility();
-            applyFilters();
+      document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
+        radio.addEventListener('change', function () {
+          currentViewMode = this.value;
+          updateFilterVisibility();
+          applyFilters();
         });
-    });
-    
-    // 更新筛选器可见性
-    function updateFilterVisibility() {
+      });
+
+      function updateFilterVisibility() {
         if (currentViewMode === 'teacher-only') {
-            teacherFilterGroup.classList.remove('hidden');
-            studentFilterGroup.classList.add('hidden');
+          teacherFilterGroup.classList.remove('hidden');
+          studentFilterGroup.classList.add('hidden');
         } else if (currentViewMode === 'student-only') {
-            teacherFilterGroup.classList.add('hidden');
-            studentFilterGroup.classList.remove('hidden');
+          teacherFilterGroup.classList.add('hidden');
+          studentFilterGroup.classList.remove('hidden');
         } else {
-            teacherFilterGroup.classList.remove('hidden');
-            studentFilterGroup.classList.remove('hidden');
+          teacherFilterGroup.classList.remove('hidden');
+          studentFilterGroup.classList.remove('hidden');
         }
-    }
-    
-    // 更新当前时间显示
-    function updateCurrentTime() {
+      }
+
+      function updateCurrentTime() {
         const now = new Date();
         currentTimeElement.textContent = now.toLocaleString('zh-CN');
-        setTimeout(updateCurrentTime, 1000); // 每秒更新一次
-    }
-    updateCurrentTime();
+        setTimeout(updateCurrentTime, 1000);
+      }
+      updateCurrentTime();
 
-    filterTeacher.addEventListener('change', applyFilters);
-    filterStudent.addEventListener('change', applyFilters);
-    filterTopic.addEventListener('change', applyFilters);
-    filterSession.addEventListener('change', applyFilters);
-    filterDateStart.addEventListener('change', applyFilters);
-    filterDateEnd.addEventListener('change', applyFilters);
-    resetFiltersButton.addEventListener('click', () => {
+      filterTeacher.addEventListener('change', applyFilters);
+      filterStudent.addEventListener('change', applyFilters);
+      filterTopic.addEventListener('change', applyFilters);
+      filterSession.addEventListener('change', applyFilters);
+      filterDateStart.addEventListener('change', applyFilters);
+      filterDateEnd.addEventListener('change', applyFilters);
+      resetFiltersButton.addEventListener('click', () => {
         filterTeacher.value = '所有教师';
         filterStudent.value = '所有学生';
         filterTopic.value = '所有主题';
@@ -744,490 +302,280 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('input[name="view-mode"][value="all"]').checked = true;
         currentViewMode = 'all';
         updateFilterVisibility();
-        currentDisplayDate = new Date(); // 重置为当前日期
+        currentDisplayDate = new Date();
         applyFilters();
-    });
+      });
+      ganttViewBtn.addEventListener('click', () => switchView('gantt'));
+      calendarViewBtn.addEventListener('click', () => switchView('calendar'));
 
-    ganttViewBtn.addEventListener('click', () => switchView('gantt'));
-    calendarViewBtn.addEventListener('click', () => switchView('calendar'));
-
-    function switchView(view) {
+      function switchView(view) {
         if (currentView === view) return;
-        
         const currentViewEl = document.querySelector('.view.active');
         const newViewEl = document.getElementById(`${view}-view`);
-        
-        // 添加过渡动画
         currentViewEl.classList.add('fade-out');
-        
         setTimeout(() => {
-            // 切换视图
-            currentView = view;
-            ganttViewBtn.classList.toggle('active', view === 'gantt');
-            calendarViewBtn.classList.toggle('active', view === 'calendar');
-            currentViewEl.classList.remove('active', 'fade-out');
-            newViewEl.classList.add('active', 'fade-in');
-            
-            setTimeout(() => {
-                newViewEl.classList.remove('fade-in');
-                applyFilters();
-            }, 300);
+          currentView = view;
+          ganttViewBtn.classList.toggle('active', view === 'gantt');
+          calendarViewBtn.classList.toggle('active', view === 'calendar');
+          currentViewEl.classList.remove('active', 'fade-out');
+          newViewEl.classList.add('active', 'fade-in');
+          setTimeout(() => {
+            newViewEl.classList.remove('fade-in');
+            applyFilters();
+          }, 300);
         }, 200);
-    }
-    
-    function loadDataAndInitialize() {
-        // 加载教师数据
+      }
+
+      function loadDataAndInitialize() {
         fetch('data.json')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`无法加载 data.json (状态: ${response.status})。请确认后台 Excel 已上传且自动化流程成功运行。`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                allTasks = data;
-                errorMessage.textContent = '';
-                
-                // 尝试加载学生数据
-                return fetch('students.json')
-                    .catch(err => {
-                        console.warn("无法加载学生数据:", err);
-                        return { ok: false }; // 如果没有学生数据，返回失败状态
-                    });
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                } else {
-                    console.warn("学生数据不存在或无法加载，使用空数组");
-                    return [];
-                }
-            })
-            .then(studentData => {
-                students = studentData || [];
-                console.log("已加载学生数据:", students);
-                
-                // 如果无法获取学生数据，创建默认学生
-                if (students.length === 0) {
-                    students = [{
-                        id: "student_同学",
-                        name: "同学",
-                        studySessions: []
-                    }];
-                    
-                    // 从教师数据中提取课时信息，构建默认学习记录
-                    const courses = {};
-                    allTasks.forEach(task => {
-                        const key = `${task.topic}_${task.session}`;
-                        if (!courses[key] && task.topic && task.session) {
-                            courses[key] = {
-                                topic: task.topic,
-                                session: task.session
-                            };
-                        }
-                    });
-                    
-                    // 查看是否可以从数据中识别学习记录
-                    const studySessions = Object.values(courses).map((course, index) => ({
-                        id: `study_${index}`,
-                        topic: course.topic,
-                        session: course.session,
-                        startTime: "", // 这些可能需要根据实际情况设置
-                        endTime: "",
-                        duration: 60,
-                        completed: false,
-                        notes: ""
-                    }));
-                    
-                    students[0].studySessions = studySessions;
-                }
+          .then(r => { if (!r.ok) throw new Error(`无法加载 data.json (${r.status})`); return r.json(); })
+          .then(data => {
+            allTasks = data;
+            errorMessage.textContent = '';
+            return fetch('students.json').catch(() => ({ ok:false }));
+          })
+          .then(r => r.ok ? r.json() : [])
+          .then(studentData => {
+            students = studentData || [];
+            if (students.length === 0) {
+              students = [{ id: "student_同学", name: "同学", studySessions: [] }];
+            }
+            if (allTasks.length === 0 && students.length === 0) {
+              throw new Error("加载的数据为空。请检查 schedule.xlsx。");
+            }
+            lastUpdatedTimeElement.textContent = new Date().toLocaleDateString('zh-CN');
+            collapsedGroups.clear();
+            currentDisplayDate = new Date();
+            updateFilterVisibility();
+            resetFiltersButton.click();
+          })
+          .catch(err => {
+            errorMessage.textContent = '加载数据失败: ' + err.message;
+            renderEmpty();
+          });
+      }
 
-                if (allTasks.length === 0 && students.length === 0) {
-                    throw new Error("加载的数据为空。请检查后台 schedule.xlsx 文件内容是否正确。");
-                }
-                
-                // 设置最后更新时间
-                lastUpdatedTimeElement.textContent = new Date().toLocaleDateString('zh-CN');
-                
-                collapsedGroups.clear();
-                currentDisplayDate = new Date(); // 使用当前日期
-                updateFilterVisibility(); // 初始化筛选器可见性
-                resetFiltersButton.click(); // 触发第一次渲染
-            })
-            .catch(err => {
-                errorMessage.textContent = '加载数据失败: ' + err.message;
-                console.error(err);
-                renderEmpty();
-            });
-    }
-
-    // 修改的populateFilterDropdown函数
-    function populateFilterDropdown(selectElement, options, currentlySelected, defaultOption = null) {
-        // 确保默认选项（如'所有教师'）始终在第一位
+      function populateFilterDropdown(selectElement, options, currentlySelected, defaultOption = null) {
         if (defaultOption) {
-            // 先移除默认选项，以防它也在options中
-            const filteredOptions = options.filter(option => option !== defaultOption);
-            // 重建数组，默认选项在第一位
-            options = [defaultOption, ...filteredOptions];
+          const filteredOptions = options.filter(option => option !== defaultOption);
+          options = [defaultOption, ...filteredOptions];
         }
-        
-        // 如果当前选择项不再可用，使用默认选项
-        const finalSelection = (options.includes(currentlySelected) && currentlySelected) 
-            ? currentlySelected 
-            : (defaultOption || options[0]);
-        
-        // 生成选项并设置选中项
-        selectElement.innerHTML = options.map(option => 
-            `<option value="${option}" ${option === finalSelection ? 'selected' : ''}>${option}</option>`
+        const finalSelection = (options.includes(currentlySelected) && currentlySelected)
+          ? currentlySelected
+          : (defaultOption || options[0]);
+        selectElement.innerHTML = options.map(option =>
+          `<option value="${option}" ${option === finalSelection ? 'selected' : ''}>${option}</option>`
         ).join('');
-        
         return finalSelection;
-    }
+      }
 
-    // 自定义排序函数
-    function getTopicOrder(topic) {
+      function getTopicOrder(topic) {
         const order = ['压力的枷锁', '松弛技巧', '呼吸技巧', '营养和食物', '正面自语'];
         const index = order.indexOf(topic);
-        return index === -1 ? 999 : index; // 未知主题排在最后
-    }
-
-    function getSessionOrder(session) {
+        return index === -1 ? 999 : index;
+      }
+      function getSessionOrder(session) {
         const order = ['课时一', '课时二', '课时三'];
         const index = order.indexOf(session);
-        return index === -1 ? 999 : index; // 未知课时排在最后
-    }
+        return index === -1 ? 999 : index;
+      }
+      function compareSessionNumbers(a, b) { return getSessionOrder(a) - getSessionOrder(b); }
 
-    // 正确比较课时数字的函数 - 使用自定义排序
-    function compareSessionNumbers(a, b) {
-        return getSessionOrder(a) - getSessionOrder(b);
-    }
-
-    function applyFilters() {
+      function applyFilters() {
         if (allTasks.length === 0 && students.length === 0) {
-            filterTeacher.innerHTML = ''; 
-            filterTopic.innerHTML = '';
-            filterSession.innerHTML = '';
-            filterStudent.innerHTML = '';
-            renderEmpty();
-            return;
+          filterTeacher.innerHTML = '';
+          filterTopic.innerHTML = '';
+          filterSession.innerHTML = '';
+          filterStudent.innerHTML = '';
+          renderEmpty();
+          return;
         }
-        
-        // 获取当前选择的筛选条件
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
         const currentSelectedStudent = filterStudent.value || '所有学生';
         const currentSelectedTopic = filterTopic.value || '所有主题';
-        const currentSelectedSession = filterSession.value || '所有课时'; 
+        const currentSelectedSession = filterSession.value || '所有课时';
         const dateStart = filterDateStart.value;
         const dateEnd = filterDateEnd.value;
-        
-        console.log("当前筛选条件:", {
-            教师: currentSelectedTeacher,
-            学生: currentSelectedStudent,
-            主题: currentSelectedTopic,
-            课时: currentSelectedSession,
-            视图模式: currentViewMode,
-            开始日期: dateStart || "未设置",
-            结束日期: dateEnd || "未设置"
-        });
-        
-        // 准备教师和学生数据的筛选选项
-        let teacherTopics = [];
-        let teacherSessions = [];
-        let teacherNames = [];
-        
+
+        let teacherTopics = [], teacherSessions = [], teacherNames = [];
         if (currentViewMode !== 'student-only') {
-            teacherTopics = [...new Set(allTasks.map(t => t.topic))];
-            teacherSessions = [...new Set(allTasks.map(t => t.session))];
-            teacherNames = [...new Set(allTasks.map(t => t.teacher))];
+          teacherTopics = [...new Set(allTasks.map(t => t.topic))];
+          teacherSessions = [...new Set(allTasks.map(t => t.session))];
+          teacherNames = [...new Set(allTasks.map(t => t.teacher))];
         }
-        
-        let studentTopics = [];
-        let studentSessions = [];
-        let studentNames = [];
-        
+        let studentTopics = [], studentSessions = [], studentNames = [];
         if (currentViewMode !== 'teacher-only') {
-            students.forEach(student => {
-                studentNames.push(student.name);
-                (student.studySessions || []).forEach(session => {
-                    if (session.topic) studentTopics.push(session.topic);
-                    if (session.session) studentSessions.push(session.session);
-                });
+          students.forEach(student => {
+            studentNames.push(student.name);
+            (student.studySessions || []).forEach(s => {
+              if (s.topic) studentTopics.push(s.topic);
+              if (s.session) studentSessions.push(s.session);
             });
+          });
         }
-        
-        // 合并主题、课时和名称列表，并使用自定义排序
-        const uniqueTopics = [...new Set([...teacherTopics, ...studentTopics])];
-        uniqueTopics.sort((a, b) => getTopicOrder(a) - getTopicOrder(b));
-        
-        const uniqueSessions = [...new Set([...teacherSessions, ...studentSessions])];
-        uniqueSessions.sort(compareSessionNumbers);
-        
+        const uniqueTopics = [...new Set([...teacherTopics, ...studentTopics])].sort((a,b)=>getTopicOrder(a)-getTopicOrder(b));
+        const uniqueSessions = [...new Set([...teacherSessions, ...studentSessions])].sort(compareSessionNumbers);
         const uniqueStudentNames = [...new Set(studentNames)].sort();
-        
-        // 填充筛选下拉框
+
         populateFilterDropdown(filterTeacher, teacherNames, currentSelectedTeacher, '所有教师');
         populateFilterDropdown(filterStudent, uniqueStudentNames, currentSelectedStudent, '所有学生');
         populateFilterDropdown(filterTopic, uniqueTopics, currentSelectedTopic, '所有主题');
         populateFilterDropdown(filterSession, uniqueSessions, currentSelectedSession, '所有课时');
-        
-        // 准备要渲染的数据
+
         let tasksToRender = [];
         let studySessionsToRender = [];
-        
-        // 筛选教师课程
+
         if (currentViewMode !== 'student-only') {
-            tasksToRender = allTasks.filter(task => {
-                const teacherMatch = (currentSelectedTeacher === '所有教师' || task.teacher === currentSelectedTeacher);
-                const topicMatch = (currentSelectedTopic === '所有主题' || task.topic === currentSelectedTopic);
-                const sessionMatch = (currentSelectedSession === '所有课时' || 
-                                    (task.session && task.session === currentSelectedSession));
-                const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && 
-                                (!dateEnd || task.sessionStart <= dateEnd);
-                return teacherMatch && topicMatch && sessionMatch && dateMatch;
-            });
+          tasksToRender = allTasks.filter(task => {
+            const teacherMatch = (currentSelectedTeacher === '所有教师' || task.teacher === currentSelectedTeacher);
+            const topicMatch = (currentSelectedTopic === '所有主题' || task.topic === currentSelectedTopic);
+            const sessionMatch = (currentSelectedSession === '所有课时' || (task.session && task.session === currentSelectedSession));
+            const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && (!dateEnd || task.sessionStart <= dateEnd);
+            return teacherMatch && topicMatch && sessionMatch && dateMatch;
+          });
         }
-        
-        // 筛选学生学习记录
+
         if (currentViewMode !== 'teacher-only') {
-            const filteredStudents = currentSelectedStudent === '所有学生' 
-                ? students 
-                : students.filter(s => s.name === currentSelectedStudent);
-                
-            studySessionsToRender = [];
-            
-            filteredStudents.forEach(student => {
-                (student.studySessions || []).filter(session => {
-                    const topicMatch = (currentSelectedTopic === '所有主题' || session.topic === currentSelectedTopic);
-                    const sessionMatch = (currentSelectedSession === '所有课时' || session.session === currentSelectedSession);
-                    const dateMatch = (!dateStart || (!session.endTime || session.endTime >= dateStart)) && 
-                                    (!dateEnd || (!session.startTime || session.startTime <= dateEnd));
-                    return topicMatch && sessionMatch && dateMatch;
-                }).forEach(session => {
-                    studySessionsToRender.push({
-                        ...session,
-                        studentName: student.name,
-                        studentId: student.id
-                    });
-                });
+          const filteredStudents = currentSelectedStudent === '所有学生' ? students : students.filter(s => s.name === currentSelectedStudent);
+          filteredStudents.forEach(student => {
+            (student.studySessions || []).filter(s => {
+              const topicMatch = (currentSelectedTopic === '所有主题' || s.topic === currentSelectedTopic);
+              const sessionMatch = (currentSelectedSession === '所有课时' || s.session === currentSelectedSession);
+              const dateMatch = (!dateStart || (!s.endTime || s.endTime >= dateStart)) && (!dateEnd || (!s.startTime || s.startTime <= dateEnd));
+              return topicMatch && sessionMatch && dateMatch;
+            }).forEach(s => {
+              studySessionsToRender.push({ ...s, studentName: student.name, studentId: student.id });
             });
+          });
         }
-        
-        console.log(`筛选后: ${tasksToRender.length}个教师课程, ${studySessionsToRender.length}个学生学习记录`);
-        
+
         updateColors();
-        
         if (currentView === 'gantt') {
-            renderGantt(tasksToRender, studySessionsToRender);
+          renderGantt(tasksToRender, studySessionsToRender);
         } else {
-            renderCalendar(tasksToRender, studySessionsToRender);
+          renderCalendar(tasksToRender, studySessionsToRender);
         }
-    }
-    
-    function updateColors() {
+      }
+
+      function updateColors() {
         const allTopics = new Set([
-            ...allTasks.map(t => t.topic),
-            ...students.flatMap(s => (s.studySessions || []).map(session => session.topic))
+          ...allTasks.map(t => t.topic),
+          ...students.flatMap(s => (s.studySessions || []).map(ss => ss.topic))
         ]);
-        
         [...allTopics].sort().forEach((topic, index) => {
-            if (!topicColors[topic] && topic) { 
-                topicColors[topic] = colors[index % colors.length]; 
-            }
+          if (!topicColors[topic] && topic) topicColors[topic] = colors[index % colors.length];
         });
-    }
+      }
 
-    function addInteractionListeners(task, element, isCourseBar = false) {
-        element.addEventListener('mouseover', (e) => {
-            if (currentView === 'gantt') {
-                const rowIndex = element.dataset.rowIndex; if (!rowIndex) return;
-                const relatedElements = document.querySelectorAll(`[data-row-index='${rowIndex}']`);
-                ganttView.querySelector('.gantt-chart').classList.add('is-hovering');
-                element.classList.add('is-hovered'); 
-                relatedElements.forEach(el => el.classList.add('highlight'));
-            }
-            showTooltip(e, task, isCourseBar);
-        });
-        element.addEventListener('mousemove', (e) => { updateTooltipPosition(e); });
-        element.addEventListener('mouseout', () => {
-            if (currentView === 'gantt') {
-                const rowIndex = element.dataset.rowIndex; if (!rowIndex) return;
-                const relatedElements = document.querySelectorAll(`[data-row-index='${rowIndex}']`);
-                ganttView.querySelector('.gantt-chart').classList.remove('is-hovering');
-                element.classList.remove('is-hovered');
-                relatedElements.forEach(el => el.classList.remove('highlight'));
-            }
-            hideTooltip();
-        });
-    }
-    
-    // 学生学习记录悬停交互
-    function addStudyInteractionListeners(studySession, element) {
-        element.addEventListener('mouseover', (e) => {
-            if (currentView === 'gantt') {
-                const rowIndex = element.dataset.rowIndex; if (!rowIndex) return;
-                const relatedElements = document.querySelectorAll(`[data-row-index='${rowIndex}']`);
-                ganttView.querySelector('.gantt-chart').classList.add('is-hovering');
-                element.classList.add('is-hovered'); 
-                relatedElements.forEach(el => el.classList.add('highlight'));
-            }
-            showStudyTooltip(e, studySession);
-        });
-        element.addEventListener('mousemove', (e) => { updateTooltipPosition(e); });
-        element.addEventListener('mouseout', () => {
-            if (currentView === 'gantt') {
-                const rowIndex = element.dataset.rowIndex; if (!rowIndex) return;
-                const relatedElements = document.querySelectorAll(`[data-row-index='${rowIndex}']`);
-                ganttView.querySelector('.gantt-chart').classList.remove('is-hovering');
-                element.classList.remove('is-hovered');
-                relatedElements.forEach(el => el.classList.remove('highlight'));
-            }
-            hideTooltip();
-        });
-    }
-
-    function showTooltip(event, task, isCourseBar) {
-        const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
-        const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+      function showTooltip(event, task, isCourseBar) {
+        const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n,i)=> i===1 ? n-1 : n)));
+        const diffDays = (d1,d2)=> Math.round((d2-d1)/(1000*60*60*24))+1;
         let title, start, end, duration;
-        
-        if (isCourseBar) { 
-            title = "课程总览"; 
-            start = task.courseStart; 
-            end = task.courseEnd; 
-            duration = diffDays(parseDate(start), parseDate(end));
-        } 
-        else { 
-            title = `课时: ${task.session}`; 
-            start = task.sessionStart; 
-            end = task.sessionEnd; 
-            duration = diffDays(parseDate(start), parseDate(end));
-        }
-        
+        if (isCourseBar) { title="课程总览"; start=task.courseStart; end=task.courseEnd; }
+        else { title=`课时: ${task.session}`; start=task.sessionStart; end=task.sessionEnd; }
+        duration = diffDays(parseDate(start), parseDate(end));
         tooltip.innerHTML = `
-            <div class="tooltip-row"><span class="tooltip-label">${title}</span></div>
-            <hr style="border-color: #555; border-style: solid; margin: 5px 0;">
-            <div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${task.topic}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">负责人:</span> <span class="tooltip-value">${task.teacher}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration} 天</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">${title}</span></div>
+          <hr style="border-color:#555;border-style:solid;margin:5px 0;">
+          <div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${task.topic}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">负责人:</span> <span class="tooltip-value">${task.teacher}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration} 天</span></div>
         `;
-        
-        updateTooltipPosition(event);
+        tooltip.style.left = `${event.clientX}px`;
+        tooltip.style.top = `${event.clientY - 15}px`;
         tooltip.classList.add('visible');
-    }
-    
-    // 学生学习记录悬停提示
-    function showStudyTooltip(event, studySession) {
-        const parseDate = (str) => str ? new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n))) : new Date();
-        const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
-        
-        const start = studySession.startTime || '未设置';
-        const end = studySession.endTime || '未设置';
+      }
+      function showStudyTooltip(event, s) {
+        const parseDate = (str)=> str? new Date(Date.UTC(...str.split('-').map((n,i)=> i===1? n-1:n))) : new Date();
+        const diffDays = (d1,d2)=> Math.round((d2-d1)/(1000*60*60*24))+1;
+        const start = s.startTime || '未设置';
+        const end = s.endTime || '未设置';
         let duration = '未知';
-        
-        if (studySession.startTime && studySession.endTime) {
-            duration = diffDays(parseDate(start), parseDate(end)) + ' 天';
-        } else if (studySession.duration) {
-            duration = studySession.duration + ' 分钟';
-        }
-        
-        const completedText = studySession.completed ? '已完成' : '进行中';
-        const notesText = studySession.notes ? 
-            `<div class="tooltip-row"><span class="tooltip-label">笔记:</span> <span class="tooltip-value">${studySession.notes}</span></div>` : '';
-        
+        if (s.startTime && s.endTime) duration = diffDays(parseDate(start), parseDate(end)) + ' 天';
+        else if (s.duration) duration = s.duration + ' 分钟';
+        const completedText = s.completed ? '已完成' : '进行中';
+        const notesText = s.notes ? `<div class="tooltip-row"><span class="tooltip-label">笔记:</span> <span class="tooltip-value">${s.notes}</span></div>` : '';
         tooltip.innerHTML = `
-            <div class="tooltip-row"><span class="tooltip-label">学习记录: ${studySession.studentName}</span></div>
-            <hr style="border-color: #555; border-style: solid; margin: 5px 0;">
-            <div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${studySession.topic}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">课时:</span> <span class="tooltip-value">${studySession.session}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration}</span></div>
-            <div class="tooltip-row"><span class="tooltip-label">状态:</span> <span class="tooltip-value">${completedText}</span></div>
-            ${notesText}
+          <div class="tooltip-row"><span class="tooltip-label">学习记录: ${s.studentName}</span></div>
+          <hr style="border-color:#555;border-style:solid;margin:5px 0;">
+          <div class="tooltip-row"><span class="tooltip-label">主题:</span> <span class="tooltip-value">${s.topic}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">课时:</span> <span class="tooltip-value">${s.session}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">开始:</span> <span class="tooltip-value">${start}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">结束:</span> <span class="tooltip-value">${end}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">时长:</span> <span class="tooltip-value">${duration}</span></div>
+          <div class="tooltip-row"><span class="tooltip-label">状态:</span> <span class="tooltip-value">${completedText}</span></div>
+          ${notesText}
         `;
-        
-        updateTooltipPosition(event);
+        tooltip.style.left = `${event.clientX}px`;
+        tooltip.style.top = `${event.clientY - 15}px`;
         tooltip.classList.add('visible');
-    }
-    
-    function hideTooltip() { tooltip.classList.remove('visible'); }
-    function updateTooltipPosition(event) { tooltip.style.left = `${event.clientX}px`; tooltip.style.top = `${event.clientY - 15}px`; }
+      }
+      function hideTooltip(){ tooltip.classList.remove('visible'); }
 
-    function toggleGroup(groupName) {
-        if (collapsedGroups.has(groupName)) {
-            collapsedGroups.delete(groupName);
-        } else {
-            collapsedGroups.add(groupName);
-        }
-        
+      function addInteractionListeners(task, element, isCourseBar=false) {
+        element.addEventListener('mouseover', e => showTooltip(e, task, isCourseBar));
+        element.addEventListener('mousemove', e => { tooltip.style.left = `${e.clientX}px`; tooltip.style.top = `${e.clientY - 15}px`; });
+        element.addEventListener('mouseout', hideTooltip);
+      }
+      function addStudyInteractionListeners(s, element) {
+        element.addEventListener('mouseover', e => showStudyTooltip(e, s));
+        element.addEventListener('mousemove', e => { tooltip.style.left = `${e.clientX}px`; tooltip.style.top = `${e.clientY - 15}px`; });
+        element.addEventListener('mouseout', hideTooltip);
+      }
+
+      function toggleGroup(groupName) {
+        if (collapsedGroups.has(groupName)) collapsedGroups.delete(groupName);
+        else collapsedGroups.add(groupName);
         applyFilters();
-    }
+      }
 
-    function renderEmpty() {
+      function renderEmpty() {
         const emptyMessage = '没有数据可供显示。';
         if (currentView === 'gantt') {
-            ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
-            ganttGrid.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+          ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
+          ganttGrid.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
         } else {
-            calendarView.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+          calendarView.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
         }
-    }
+      }
 
-    function createUserSelector() {
+      function createUserSelector() {
         const existingSelector = document.querySelector('.user-selector');
-        if (existingSelector) {
-            existingSelector.remove();
-        }
-        
+        if (existingSelector) existingSelector.remove();
         const userSelector = document.createElement('div');
         userSelector.className = 'user-selector';
-        
         const title = document.createElement('div');
         title.className = 'user-selector-title';
         title.textContent = '选择当前用户:';
         userSelector.appendChild(title);
-        
         users.forEach(user => {
-            const userOption = document.createElement('div');
-            userOption.className = 'user-option';
-            
-            const colorBox = document.createElement('span');
-            colorBox.className = `user-color user-${user.id}`;
-            colorBox.style.backgroundColor = user.color;
-            
-            const radioBtn = document.createElement('input');
-            radioBtn.type = 'radio';
-            radioBtn.name = 'current-user';
-            radioBtn.value = user.id;
-            radioBtn.id = `user-${user.id}`;
-            radioBtn.checked = currentUser === user.id;
-            radioBtn.style.marginRight = '5px';
-            
-            radioBtn.addEventListener('change', function() {
-                currentUser = this.value;
-            });
-            
-            const label = document.createElement('label');
-            label.htmlFor = `user-${user.id}`;
-            label.textContent = user.name;
-            
-            userOption.appendChild(radioBtn);
-            userOption.appendChild(colorBox);
-            userOption.appendChild(label);
-            userSelector.appendChild(userOption);
+          const userOption = document.createElement('div');
+          userOption.className = 'user-option';
+          const colorBox = document.createElement('span');
+          colorBox.className = `user-color user-${user.id}`;
+          colorBox.style.backgroundColor = user.color;
+          const radioBtn = document.createElement('input');
+          radioBtn.type = 'radio'; radioBtn.name = 'current-user'; radioBtn.value = user.id;
+          radioBtn.id = `user-${user.id}`; radioBtn.checked = currentUser === user.id;
+          radioBtn.style.marginRight = '5px';
+          radioBtn.addEventListener('change', function(){ currentUser = this.value; });
+          const label = document.createElement('label');
+          label.htmlFor = `user-${user.id}`; label.textContent = user.name;
+          userOption.appendChild(radioBtn);
+          userOption.appendChild(colorBox);
+          userOption.appendChild(label);
+          userSelector.appendChild(userOption);
         });
-        
         const legend = document.createElement('div');
         legend.className = 'user-selector-legend';
         legend.textContent = '勾选颜色代表不同用户的完成状态';
-        
         userSelector.appendChild(legend);
         document.body.appendChild(userSelector);
-    }
+      }
 
-    function renderCalendar(tasksToRender, studySessionsToRender) {
+      function renderCalendar(tasksToRender, studySessionsToRender) {
         calendarView.innerHTML = '';
         const header = document.createElement('div'); header.className = 'calendar-header';
         const nav = document.createElement('div'); nav.className = 'calendar-nav';
@@ -1240,862 +588,440 @@ document.addEventListener('DOMContentLoaded', function() {
         nextBtn.onclick = () => { currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1); applyFilters(); };
         const title = document.createElement('h3'); title.textContent = `${currentDisplayDate.getFullYear()}年 ${currentDisplayDate.getMonth() + 1}月`;
         header.append(nav, title);
-        
+
         createUserSelector();
-        
+
         const gridContainer = document.createElement('div'); gridContainer.className = 'calendar-grid-container';
         const weekdays = document.createElement('div'); weekdays.className = 'calendar-weekdays';
-        ['日', '一', '二', '三', '四', '五', '六'].forEach(day => { const dayEl = document.createElement('div'); dayEl.textContent = day; weekdays.appendChild(dayEl); });
+        ['日','一','二','三','四','五','六'].forEach(day => { const d=document.createElement('div'); d.textContent=day; weekdays.appendChild(d); });
         const grid = document.createElement('div'); grid.className = 'calendar-grid';
         const year = currentDisplayDate.getFullYear(); const month = currentDisplayDate.getMonth();
         const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate(); const startDayOfWeek = firstDay.getDay();
-        for (let i = 0; i < startDayOfWeek; i++) { const dayCell = document.createElement('div'); dayCell.className = 'calendar-day other-month'; grid.appendChild(dayCell); }
-        const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        for (let i = 1; i <= daysInMonth; i++) {
-            const dayCell = document.createElement('div'); dayCell.className = 'calendar-day';
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-            dayCell.dataset.date = dateStr;
-            if (dateStr === todayStr) dayCell.classList.add('today');
-            const dayNumber = document.createElement('div'); dayNumber.className = 'day-number'; dayNumber.textContent = i;
-            dayCell.appendChild(dayNumber); grid.appendChild(dayCell);
+        for (let i=0; i<startDayOfWeek; i++) grid.appendChild(Object.assign(document.createElement('div'), { className:'calendar-day other-month' }));
+        const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        for (let i=1; i<=daysInMonth; i++) {
+          const dayCell = document.createElement('div'); dayCell.className = 'calendar-day';
+          const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+          dayCell.dataset.date = dateStr;
+          if (dateStr === todayStr) dayCell.classList.add('today');
+          const dn = document.createElement('div'); dn.className='day-number'; dn.textContent = i;
+          dayCell.appendChild(dn);
+          grid.appendChild(dayCell);
         }
-        
-        // 渲染教师课程
+
+        // 1) 教师课程彩色 marker（保持原功能）
         if (currentViewMode !== 'student-only') {
-            const processedCourses = new Set(); 
-            tasksToRender.forEach(task => {
-                const courseKey = `${task.teacher}-${task.topic}-${task.session}-${task.courseStart}-${task.courseEnd}`;
-                if (processedCourses.has(courseKey)) return;
-                processedCourses.add(courseKey);
-                
-                const courseStartDate = new Date(task.courseStart + 'T00:00:00'); 
-                const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
-                
-                const isInfoTeacher = task.teacher.includes('信息老师') || task.teacher === '信息老师';
-                
-                if (task.courseStart === task.courseEnd) {
-                    if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
-                        const dayCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                        if (dayCell) { 
-                            const marker = document.createElement('div'); 
-                            
-                            const taskId = `task-${task.teacher}-${task.topic}-${task.session}-single-${task.courseStart}`;
-                            marker.dataset.taskId = taskId;
-                            
-                            if (isInfoTeacher) {
-                                marker.className = 'calendar-marker marker-info-teacher';
-                            } else {
-                                marker.className = 'calendar-marker marker-single-day';
-                            }
-                            
-                            const taskChecks = checkStatus[taskId] || {};
-                            
-                            const checkContainer = document.createElement('div');
-                            checkContainer.className = 'multi-checkbox';
-                            
-                            users.forEach(user => {
-                                const isChecked = taskChecks[user.id] || false;
-                                
-                                const checkboxContainer = document.createElement('div');
-                                checkboxContainer.className = 'checkbox-container';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.className = 'user-checkbox';
-                                checkbox.dataset.userId = user.id;
-                                checkbox.checked = isChecked;
-                                
-                                const checkboxDisplay = document.createElement('div');
-                                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                                
-                                checkbox.addEventListener('change', function() {
-                                    const isChecked = checkbox.checked;
-                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
-                                    
-                                    if (isChecked) {
-                                        showFeedback(marker, user.id);
-                                    }
-                                });
-                                
-                                checkboxContainer.appendChild(checkbox);
-                                checkboxContainer.appendChild(checkboxDisplay);
-                                checkContainer.appendChild(checkboxContainer);
-                            });
-                            
-                            marker.prepend(checkContainer);
-                            
-                            marker.appendChild(document.createTextNode(
-                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`
-                            ));
-                            
-                            addInteractionListeners(task, marker, true); 
-                            dayCell.appendChild(marker);
-                        }
-                    }
-                } else {
-                    // 开课日
-                    if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
-                        const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                        if (startCell) { 
-                            const marker = document.createElement('div'); 
-                            
-                            const taskId = `task-${task.teacher}-${task.topic}-${task.session}-start-${task.courseStart}`;
-                            marker.dataset.taskId = taskId;
-                            
-                            if (isInfoTeacher) {
-                                marker.className = 'calendar-marker marker-info-start';
-                            } else {
-                                marker.className = 'calendar-marker marker-start';
-                            }
-                            
-                            const taskChecks = checkStatus[taskId] || {};
-                            
-                            const checkContainer = document.createElement('div');
-                            checkContainer.className = 'multi-checkbox';
-                            
-                            users.forEach(user => {
-                                const isChecked = taskChecks[user.id] || false;
-                                
-                                const checkboxContainer = document.createElement('div');
-                                checkboxContainer.className = 'checkbox-container';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.className = 'user-checkbox';
-                                checkbox.dataset.userId = user.id;
-                                checkbox.checked = isChecked;
-                                
-                                const checkboxDisplay = document.createElement('div');
-                                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                                
-                                checkbox.addEventListener('change', function() {
-                                    const isChecked = checkbox.checked;
-                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
-                                    
-                                    if (isChecked) {
-                                        showFeedback(marker, user.id);
-                                    }
-                                });
-                                
-                                checkboxContainer.appendChild(checkbox);
-                                checkboxContainer.appendChild(checkboxDisplay);
-                                checkContainer.appendChild(checkboxContainer);
-                            });
-                            
-                            marker.prepend(checkContainer);
-                            
-                            marker.appendChild(document.createTextNode(
-                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`
-                            ));
-                            
-                            addInteractionListeners(task, marker, true); 
-                            startCell.appendChild(marker);
-                        }
-                    }
-                    // 结课日
-                    if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
-                        const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
-                        if (endCell) { 
-                            const marker = document.createElement('div'); 
-                            
-                            const taskId = `task-${task.teacher}-${task.topic}-${task.session}-end-${task.courseEnd}`;
-                            marker.dataset.taskId = taskId;
-                            
-                            if (isInfoTeacher) {
-                                marker.className = 'calendar-marker marker-info-end';
-                            } else {
-                                marker.className = 'calendar-marker marker-end';
-                            }
-                            
-                            const taskChecks = checkStatus[taskId] || {};
-                            
-                            const checkContainer = document.createElement('div');
-                            checkContainer.className = 'multi-checkbox';
-                            
-                            users.forEach(user => {
-                                const isChecked = taskChecks[user.id] || false;
-                                
-                                const checkboxContainer = document.createElement('div');
-                                checkboxContainer.className = 'checkbox-container';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.className = 'user-checkbox';
-                                checkbox.dataset.userId = user.id;
-                                checkbox.checked = isChecked;
-                                
-                                const checkboxDisplay = document.createElement('div');
-                                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                                
-                                checkbox.addEventListener('change', function() {
-                                    const isChecked = checkbox.checked;
-                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
-                                    
-                                    if (isChecked) {
-                                        showFeedback(marker, user.id);
-                                    }
-                                });
-                                
-                                checkboxContainer.appendChild(checkbox);
-                                checkboxContainer.appendChild(checkboxDisplay);
-                                checkContainer.appendChild(checkboxContainer);
-                            });
-                            
-                            marker.prepend(checkContainer);
-                            
-                            marker.appendChild(document.createTextNode(
-                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`
-                            ));
-                            
-                            addInteractionListeners(task, marker, true); 
-                            endCell.appendChild(marker);
-                        }
-                    }
+          const processedCourses = new Set();
+          tasksToRender.forEach(task => {
+            const courseKey = `${task.teacher}-${task.topic}-${task.session}-${task.courseStart}-${task.courseEnd}`;
+            if (processedCourses.has(courseKey)) return;
+            processedCourses.add(courseKey);
+
+            const courseStartDate = new Date(task.courseStart + 'T00:00:00');
+            const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
+            const isInfoTeacher = task.teacher && (task.teacher.includes('信息老师') || task.teacher === '信息老师');
+
+            if (task.courseStart === task.courseEnd) {
+              if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
+                const dayCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
+                if (dayCell) {
+                  const marker = document.createElement('div');
+                  const taskId = `task-${task.teacher}-${task.topic}-${task.session}-single-${task.courseStart}`;
+                  marker.dataset.taskId = taskId;
+                  marker.className = isInfoTeacher ? 'calendar-marker marker-info-teacher' : 'calendar-marker marker-single-day';
+                  const taskChecks = checkStatus[taskId] || {};
+                  const checkContainer = document.createElement('div');
+                  checkContainer.className = 'multi-checkbox';
+                  users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    const ctn = document.createElement('div'); ctn.className = 'checkbox-container';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='user-checkbox'; cb.dataset.userId=user.id; cb.checked=isChecked;
+                    const disp = document.createElement('div'); disp.className = `checkbox-display ${user.id}`;
+                    cb.addEventListener('change', function(){
+                      saveMultiUserCheckStatus(taskId, user.id, cb.checked);
+                      if (cb.checked) showFeedback(marker, user.id);
+                    });
+                    ctn.appendChild(cb); ctn.appendChild(disp); checkContainer.appendChild(ctn);
+                  });
+                  marker.prepend(checkContainer);
+                  marker.appendChild(document.createTextNode(`${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''}`));
+                  addInteractionListeners(task, marker, true);
+                  dayCell.appendChild(marker);
                 }
-            });
+              }
+            } else {
+              // 开课日 marker
+              if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
+                const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
+                if (startCell) {
+                  const marker = document.createElement('div');
+                  const taskId = `task-${task.teacher}-${task.topic}-${task.session}-start-${task.courseStart}`;
+                  marker.dataset.taskId = taskId;
+                  marker.className = isInfoTeacher ? 'calendar-marker marker-info-start' : 'calendar-marker marker-start';
+                  const taskChecks = checkStatus[taskId] || {};
+                  const checkContainer = document.createElement('div'); checkContainer.className='multi-checkbox';
+                  users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    const ctn = document.createElement('div'); ctn.className='checkbox-container';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='user-checkbox'; cb.dataset.userId=user.id; cb.checked=isChecked;
+                    const disp = document.createElement('div'); disp.className=`checkbox-display ${user.id}`;
+                    cb.addEventListener('change', function(){
+                      saveMultiUserCheckStatus(taskId, user.id, cb.checked);
+                      if (cb.checked) showFeedback(marker, user.id);
+                    });
+                    ctn.appendChild(cb); ctn.appendChild(disp); checkContainer.appendChild(ctn);
+                  });
+                  marker.prepend(checkContainer);
+                  marker.appendChild(document.createTextNode(`${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`));
+                  addInteractionListeners(task, marker, true);
+                  startCell.appendChild(marker);
+                }
+              }
+              // 结课日 marker
+              if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
+                const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
+                if (endCell) {
+                  const marker = document.createElement('div');
+                  const taskId = `task-${task.teacher}-${task.topic}-${task.session}-end-${task.courseEnd}`;
+                  marker.dataset.taskId = taskId;
+                  marker.className = isInfoTeacher ? 'calendar-marker marker-info-end' : 'calendar-marker marker-end';
+                  const taskChecks = checkStatus[taskId] || {};
+                  const checkContainer = document.createElement('div'); checkContainer.className='multi-checkbox';
+                  users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    const ctn = document.createElement('div'); ctn.className='checkbox-container';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='user-checkbox'; cb.dataset.userId=user.id; cb.checked=isChecked;
+                    const disp = document.createElement('div'); disp.className=`checkbox-display ${user.id}`;
+                    cb.addEventListener('change', function(){
+                      saveMultiUserCheckStatus(taskId, user.id, cb.checked);
+                    if (cb.checked) showFeedback(marker, user.id);
+                    });
+                    ctn.appendChild(cb); ctn.appendChild(disp); checkContainer.appendChild(ctn);
+                  });
+                  marker.prepend(checkContainer);
+                  marker.appendChild(document.createTextNode(`${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`));
+                  addInteractionListeners(task, marker, true);
+                  endCell.appendChild(marker);
+                }
+              }
+            }
+          });
         }
-        
-        // 渲染学生学习记录
+
+        // 2) 学生学习记录 marker（保持原功能）
         if (currentViewMode !== 'teacher-only' && studySessionsToRender.length > 0) {
-            studySessionsToRender.forEach(session => {
-                if (!session.startTime || !session.endTime) return; // 跳过没有日期的记录
-                
-                const studyStartDate = new Date(session.startTime + 'T00:00:00');
-                const studyEndDate = new Date(session.endTime + 'T00:00:00');
-                
-                if (session.startTime === session.endTime) {
-                    // 单日学习
-                    if (studyStartDate.getFullYear() === year && studyStartDate.getMonth() === month) {
-                        const dayCell = grid.querySelector(`.calendar-day[data-date="${session.startTime}"]`);
-                        if (dayCell) { 
-                            const marker = document.createElement('div');
-                            
-                            const taskId = `student-${session.studentName}-${session.topic}-${session.session}-single-${session.startTime}`;
-                            marker.dataset.taskId = taskId;
-                            
-                            marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
-                            
-                            const taskChecks = checkStatus[taskId] || {};
-                            
-                            const checkContainer = document.createElement('div');
-                            checkContainer.className = 'multi-checkbox';
-                            
-                            users.forEach(user => {
-                                const isChecked = taskChecks[user.id] || false;
-                                
-                                const checkboxContainer = document.createElement('div');
-                                checkboxContainer.className = 'checkbox-container';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.className = 'user-checkbox';
-                                checkbox.dataset.userId = user.id;
-                                checkbox.checked = isChecked;
-                                
-                                const checkboxDisplay = document.createElement('div');
-                                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                                
-                                checkbox.addEventListener('change', function() {
-                                    const isChecked = checkbox.checked;
-                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
-                                    
-                                    if (isChecked) {
-                                        showFeedback(marker, user.id);
-                                    }
-                                });
-                                
-                                checkboxContainer.appendChild(checkbox);
-                                checkboxContainer.appendChild(checkboxDisplay);
-                                checkContainer.appendChild(checkboxContainer);
-                            });
-                            
-                            marker.prepend(checkContainer);
-                            
-                            marker.appendChild(document.createTextNode(
-                                `${session.studentName} - ${session.topic} ${session.session}`
-                            ));
-                            
-                            // 添加悬停交互
-                            addStudyInteractionListeners(session, marker);
-                            dayCell.appendChild(marker);
-                        }
-                    }
-                } else {
-                    // 开始学习日
-                    if (studyStartDate.getFullYear() === year && studyStartDate.getMonth() === month) {
-                        const startCell = grid.querySelector(`.calendar-day[data-date="${session.startTime}"]`);
-                        if (startCell) { 
-                            const marker = document.createElement('div');
-                            
-                            const taskId = `student-${session.studentName}-${session.topic}-${session.session}-start-${session.startTime}`;
-                            marker.dataset.taskId = taskId;
-                            
-                            marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
-                            
-                            const taskChecks = checkStatus[taskId] || {};
-                            
-                            const checkContainer = document.createElement('div');
-                            checkContainer.className = 'multi-checkbox';
-                            
-                            users.forEach(user => {
-                                const isChecked = taskChecks[user.id] || false;
-                                
-                                const checkboxContainer = document.createElement('div');
-                                checkboxContainer.className = 'checkbox-container';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.className = 'user-checkbox';
-                                checkbox.dataset.userId = user.id;
-                                checkbox.checked = isChecked;
-                                
-                                const checkboxDisplay = document.createElement('div');
-                                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                                
-                                checkbox.addEventListener('change', function() {
-                                    const isChecked = checkbox.checked;
-                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
-                                    
-                                    if (isChecked) {
-                                        showFeedback(marker, user.id);
-                                    }
-                                });
-                                
-                                checkboxContainer.appendChild(checkbox);
-                                checkboxContainer.appendChild(checkboxDisplay);
-                                checkContainer.appendChild(checkboxContainer);
-                            });
-                            
-                            marker.prepend(checkContainer);
-                            
-                            marker.appendChild(document.createTextNode(
-                                `${session.studentName} - ${session.topic} ${session.session} (开始)`
-                            ));
-                            
-                            addStudyInteractionListeners(session, marker);
-                            startCell.appendChild(marker);
-                        }
-                    }
-                    
-                    // 结束学习日
-                    if (studyEndDate.getFullYear() === year && studyEndDate.getMonth() === month) {
-                        const endCell = grid.querySelector(`.calendar-day[data-date="${session.endTime}"]`);
-                        if (endCell) { 
-                            const marker = document.createElement('div');
-                            
-                            const taskId = `student-${session.studentName}-${session.topic}-${session.session}-end-${session.endTime}`;
-                            marker.dataset.taskId = taskId;
-                            
-                            marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
-                            
-                            const taskChecks = checkStatus[taskId] || {};
-                            
-                            const checkContainer = document.createElement('div');
-                            checkContainer.className = 'multi-checkbox';
-                            
-                            users.forEach(user => {
-                                const isChecked = taskChecks[user.id] || false;
-                                
-                                const checkboxContainer = document.createElement('div');
-                                checkboxContainer.className = 'checkbox-container';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.className = 'user-checkbox';
-                                checkbox.dataset.userId = user.id;
-                                checkbox.checked = isChecked;
-                                
-                                const checkboxDisplay = document.createElement('div');
-                                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                                
-                                checkbox.addEventListener('change', function() {
-                                    const isChecked = checkbox.checked;
-                                    saveMultiUserCheckStatus(taskId, user.id, isChecked);
-                                    
-                                    if (isChecked) {
-                                        showFeedback(marker, user.id);
-                                    }
-                                });
-                                
-                                checkboxContainer.appendChild(checkbox);
-                                checkboxContainer.appendChild(checkboxDisplay);
-                                checkContainer.appendChild(checkboxContainer);
-                            });
-                            
-                            marker.prepend(checkContainer);
-                            
-                            marker.appendChild(document.createTextNode(
-                                `${session.studentName} - ${session.topic} ${session.session} (结束)`
-                            ));
-                            
-                            addStudyInteractionListeners(session, marker);
-                            endCell.appendChild(marker);
-                        }
-                    }
+          studySessionsToRender.forEach(session => {
+            if (!session.startTime || !session.endTime) return;
+            const studyStartDate = new Date(session.startTime + 'T00:00:00');
+            const studyEndDate = new Date(session.endTime + 'T00:00:00');
+
+            if (session.startTime === session.endTime) {
+              if (studyStartDate.getFullYear() === year && studyStartDate.getMonth() === month) {
+                const dayCell = grid.querySelector(`.calendar-day[data-date="${session.startTime}"]`);
+                if (dayCell) {
+                  const marker = document.createElement('div');
+                  const taskId = `student-${session.studentName}-${session.topic}-${session.session}-single-${session.startTime}`;
+                  marker.dataset.taskId = taskId;
+                  marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
+                  const taskChecks = checkStatus[taskId] || {};
+                  const checkContainer = document.createElement('div'); checkContainer.className='multi-checkbox';
+                  users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    const ctn = document.createElement('div'); ctn.className='checkbox-container';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='user-checkbox'; cb.dataset.userId=user.id; cb.checked=isChecked;
+                    const disp = document.createElement('div'); disp.className=`checkbox-display ${user.id}`;
+                    cb.addEventListener('change', function(){
+                      saveMultiUserCheckStatus(taskId, user.id, cb.checked);
+                      if (cb.checked) showFeedback(marker, user.id);
+                    });
+                    ctn.appendChild(cb); ctn.appendChild(disp); checkContainer.appendChild(ctn);
+                  });
+                  marker.prepend(checkContainer);
+                  marker.appendChild(document.createTextNode(`${session.studentName} - ${session.topic} ${session.session}`));
+                  addStudyInteractionListeners(session, marker);
+                  dayCell.appendChild(marker);
                 }
-            });
+              }
+            } else {
+              if (studyStartDate.getFullYear() === year && studyStartDate.getMonth() === month) {
+                const startCell = grid.querySelector(`.calendar-day[data-date="${session.startTime}"]`);
+                if (startCell) {
+                  const marker = document.createElement('div');
+                  const taskId = `student-${session.studentName}-${session.topic}-${session.session}-start-${session.startTime}`;
+                  marker.dataset.taskId = taskId;
+                  marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
+                  const taskChecks = checkStatus[taskId] || {};
+                  const checkContainer = document.createElement('div'); checkContainer.className='multi-checkbox';
+                  users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    const ctn = document.createElement('div'); ctn.className='checkbox-container';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='user-checkbox'; cb.dataset.userId=user.id; cb.checked=isChecked;
+                    const disp = document.createElement('div'); disp.className=`checkbox-display ${user.id}`;
+                    cb.addEventListener('change', function(){
+                      saveMultiUserCheckStatus(taskId, user.id, cb.checked);
+                      if (cb.checked) showFeedback(marker, user.id);
+                    });
+                    ctn.appendChild(cb); ctn.appendChild(disp); checkContainer.appendChild(ctn);
+                  });
+                  marker.prepend(checkContainer);
+                  marker.appendChild(document.createTextNode(`${session.studentName} - ${session.topic} ${session.session} (开始)`));
+                  addStudyInteractionListeners(session, marker);
+                  startCell.appendChild(marker);
+                }
+              }
+              if (studyEndDate.getFullYear() === year && studyEndDate.getMonth() === month) {
+                const endCell = grid.querySelector(`.calendar-day[data-date="${session.endTime}"]`);
+                if (endCell) {
+                  const marker = document.createElement('div');
+                  const taskId = `student-${session.studentName}-${session.topic}-${session.session}-end-${session.endTime}`;
+                  marker.dataset.taskId = taskId;
+                  marker.className = `calendar-marker student-marker ${session.completed ? 'completed' : ''}`;
+                  const taskChecks = checkStatus[taskId] || {};
+                  const checkContainer = document.createElement('div'); checkContainer.className='multi-checkbox';
+                  users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    const ctn = document.createElement('div'); ctn.className='checkbox-container';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='user-checkbox'; cb.dataset.userId=user.id; cb.checked=isChecked;
+                    const disp = document.createElement('div'); disp.className=`checkbox-display ${user.id}`;
+                    cb.addEventListener('change', function(){
+                      saveMultiUserCheckStatus(taskId, user.id, cb.checked);
+                      if (cb.checked) showFeedback(marker, user.id);
+                    });
+                    ctn.appendChild(cb); ctn.appendChild(disp); checkContainer.appendChild(ctn);
+                  });
+                  marker.prepend(checkContainer);
+                  marker.appendChild(document.createTextNode(`${session.studentName} - ${session.topic} ${session.session} (结束)`));
+                  addStudyInteractionListeners(session, marker);
+                  endCell.appendChild(marker);
+                }
+              }
+            }
+          });
         }
 
-        /* 新增功能：在对应日期格子顶部追加“教师名上/教师名下”的纯文字注记（无色块） */
+        // 3) 新增：小字注记（老师名-主题课时-上/下），插在日期数字下方；去重
         if (currentViewMode !== 'student-only') {
-            // 去重，避免同一教师同一天重复标记
-            const startNotesSet = new Set();
-            const endNotesSet = new Set();
+          const startNotesSet = new Set();
+          const endNotesSet = new Set();
+          tasksToRender.forEach(task => {
+            if (!task.courseStart || !task.courseEnd) return;
+            const courseStartDate = new Date(task.courseStart + 'T00:00:00');
+            const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
 
-            tasksToRender.forEach(task => {
-                // 只对课程起止范围进行注记（和上面的 marker 保持一致的月份范围）
-                const courseStartDate = new Date(task.courseStart + 'T00:00:00');
-                const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
-
-                // 起始
-                if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
-                    const key = `${task.teacher}-${task.courseStart}-start`;
-                    if (!startNotesSet.has(key)) {
-                        const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
-                        if (startCell) {
-                            const note = document.createElement('div');
-                            note.className = 'calendar-text-note';
-                            note.textContent = `${task.teacher}上`;
-                            // 插到日期数字后、其他 marker 之前：作为顶部文本提示
-                            const dayNum = startCell.querySelector('.day-number');
-                            if (dayNum && dayNum.nextSibling) {
-                                startCell.insertBefore(note, dayNum.nextSibling);
-                            } else {
-                                startCell.appendChild(note);
-                            }
-                            startNotesSet.add(key);
-                        }
-                    }
+            // 起始小字（上）
+            if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
+              const key = `${task.teacher}|${task.topic}|${task.session}|${task.courseStart}|up`;
+              if (!startNotesSet.has(key)) {
+                const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
+                if (startCell) {
+                  const note = document.createElement('div');
+                  note.className = 'calendar-text-note';
+                  note.textContent = `${task.teacher}老师-${(task.topic || '')}${(task.session || '')}-上`;
+                  const dayNum = startCell.querySelector('.day-number');
+                  if (dayNum && dayNum.nextSibling) startCell.insertBefore(note, dayNum.nextSibling);
+                  else startCell.appendChild(note);
+                  startNotesSet.add(key);
                 }
-
-                // 结束
-                if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
-                    const key = `${task.teacher}-${task.courseEnd}-end`;
-                    if (!endNotesSet.has(key)) {
-                        const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
-                        if (endCell) {
-                            const note = document.createElement('div');
-                            note.className = 'calendar-text-note';
-                            note.textContent = `${task.teacher}下`;
-                            const dayNum = endCell.querySelector('.day-number');
-                            if (dayNum && dayNum.nextSibling) {
-                                endCell.insertBefore(note, dayNum.nextSibling);
-                            } else {
-                                endCell.appendChild(note);
-                            }
-                            endNotesSet.add(key);
-                        }
-                    }
+              }
+            }
+            // 结束小字（下）
+            if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
+              const key = `${task.teacher}|${task.topic}|${task.session}|${task.courseEnd}|down`;
+              if (!endNotesSet.has(key)) {
+                const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
+                if (endCell) {
+                  const note = document.createElement('div');
+                  note.className = 'calendar-text-note';
+                  note.textContent = `${task.teacher}老师-${(task.topic || '')}${(task.session || '')}-下`;
+                  const dayNum = endCell.querySelector('.day-number');
+                  if (dayNum && dayNum.nextSibling) endCell.insertBefore(note, dayNum.nextSibling);
+                  else endCell.appendChild(note);
+                  endNotesSet.add(key);
                 }
-            });
+              }
+            }
+          });
         }
-        
+
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
-    }
+      }
 
-    function renderGantt(tasksToRender, studySessionsToRender) {
+      function renderGantt(tasksToRender, studySessionsToRender) {
         ganttTasksContainer.innerHTML = '<div class="gantt-task-header">负责人 / 课程</div>';
         ganttGrid.innerHTML = `<div class="gantt-timeline"><div class="gantt-months"></div><div class="gantt-days"></div></div><div class="gantt-rows"></div>`;
         const ganttMonths = ganttGrid.querySelector('.gantt-months');
         const ganttDays = ganttGrid.querySelector('.gantt-days');
         const ganttRows = ganttGrid.querySelector('.gantt-rows');
-        const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n, i) => i === 1 ? n - 1 : n)));
-        const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-        
+        const parseDate = (str) => new Date(Date.UTC(...str.split('-').map((n,i)=> i===1 ? n-1 : n)));
+        const diffDays = (d1, d2) => Math.round((d2 - d1) / (1000*60*60*24));
+
         if (tasksToRender.length === 0 && studySessionsToRender.length === 0) { 
-            ganttRows.innerHTML = '<div class="empty-state">没有符合条件的数据。</div>'; 
-            return; 
+          ganttRows.innerHTML = '<div class="empty-state">没有符合条件的数据。</div>'; 
+          return; 
         }
-        
-        // 收集所有日期，包括教师和学生数据
         const teacherDates = tasksToRender.flatMap(t => t.courseStart && t.courseEnd ? [parseDate(t.courseStart), parseDate(t.courseEnd)] : []);
         const studentDates = studySessionsToRender.flatMap(s => s.startTime && s.endTime ? [parseDate(s.startTime), parseDate(s.endTime)] : []);
         const allDates = [...teacherDates, ...studentDates].filter(Boolean);
-        
         if (allDates.length === 0) {
-            ganttRows.innerHTML = '<div class="empty-state">没有符合条件的日期数据。</div>';
-            return;
+          ganttRows.innerHTML = '<div class="empty-state">没有符合条件的日期数据。</div>'; return;
         }
-        
         const minDate = new Date(Math.min(...allDates)); 
         const maxDate = new Date(Math.max(...allDates));
-        maxDate.setUTCDate(maxDate.getUTCDate() + 7); // 多显示一周
-        
-        // 创建网格线容器
-        const ganttGridLines = document.createElement('div'); 
-        ganttGridLines.className = 'gantt-grid-lines';
+        maxDate.setUTCDate(maxDate.getUTCDate() + 7);
+
+        const ganttGridLines = document.createElement('div'); ganttGridLines.className='gantt-grid-lines';
         ganttRows.appendChild(ganttGridLines);
-        
-        let currentDate = new Date(minDate); let months = {}; let dayIndex = 0;
-        
-        // 改进的日期和网格线渲染
+
+        let currentDate = new Date(minDate); let months={}; let dayIndex=0;
         while (currentDate <= maxDate) {
-            const dayEl = document.createElement('div'); 
-            dayEl.className = 'gantt-day'; 
-            dayEl.textContent = currentDate.getUTCDate(); 
-            ganttDays.appendChild(dayEl);
-            
-            // 创建垂直网格线 - 修正位置
-            const lineEl = document.createElement('div'); 
-            lineEl.className = 'gantt-grid-line'; 
-            lineEl.style.left = `${dayIndex * dayWidth}px`; // 从0开始，每个单元格左侧
-            ganttGridLines.appendChild(lineEl);
-            
-            const monthKey = `${currentDate.getUTCFullYear()}-${currentDate.getUTCMonth()}`;
-            if (!months[monthKey]) { 
-                months[monthKey] = { 
-                    name: `${currentDate.getUTCFullYear()}年 ${currentDate.getUTCMonth() + 1}月`, 
-                    days: 0 
-                }; 
-            }
-            
-            months[monthKey].days++; 
-            currentDate.setUTCDate(currentDate.getUTCDate() + 1); 
-            dayIndex++;
+          const dayEl = document.createElement('div'); dayEl.className='gantt-day'; dayEl.textContent=currentDate.getUTCDate(); ganttDays.appendChild(dayEl);
+          const lineEl = document.createElement('div'); lineEl.className='gantt-grid-line'; lineEl.style.left = `${dayIndex * dayWidth}px`; ganttGridLines.appendChild(lineEl);
+          const monthKey = `${currentDate.getUTCFullYear()}-${currentDate.getUTCMonth()}`;
+          if (!months[monthKey]) months[monthKey] = { name:`${currentDate.getUTCFullYear()}年 ${currentDate.getUTCMonth()+1}月`, days:0 };
+          months[monthKey].days++;
+          currentDate.setUTCDate(currentDate.getUTCDate()+1);
+          dayIndex++;
         }
-        
-        // 添加最后一条网格线
-        const finalLineEl = document.createElement('div');
-        finalLineEl.className = 'gantt-grid-line';
-        finalLineEl.style.left = `${dayIndex * dayWidth}px`;
-        ganttGridLines.appendChild(finalLineEl);
-        
-        for (const key in months) { 
-            const month = months[key]; 
-            const monthEl = document.createElement('div'); 
-            monthEl.className = 'gantt-month'; 
-            monthEl.textContent = month.name; 
-            monthEl.style.width = `${month.days * dayWidth}px`; 
-            ganttMonths.appendChild(monthEl); 
+        const finalLineEl = document.createElement('div'); finalLineEl.className='gantt-grid-line'; finalLineEl.style.left = `${dayIndex * dayWidth}px`; ganttGridLines.appendChild(finalLineEl);
+        for (const key in months) {
+          const m = months[key]; const el = document.createElement('div'); el.className='gantt-month'; el.textContent=m.name; el.style.width = `${m.days * dayWidth}px`; ganttMonths.appendChild(el);
         }
-        
-        // 计算总共需要渲染的行数（用于设置网格高度）
+
         let displayRowIndex = 0;
-        
-        // 渲染教师数据
         if (currentViewMode !== 'student-only' && tasksToRender.length > 0) {
-            const groupedTasks = tasksToRender.reduce((acc, task) => { 
-                (acc[task.teacher] = acc[task.teacher] || []).push(task); 
-                return acc; 
-            }, {});
-            
-            const sortedTeachers = Object.keys(groupedTasks).map(teacher => { 
-                const tasks = groupedTasks[teacher]; 
-                tasks.sort((a, b) => {
-                    // 首先按主题排序（使用自定义顺序）
-                    const topicCompare = getTopicOrder(a.topic) - getTopicOrder(b.topic);
-                    if (topicCompare !== 0) return topicCompare;
-                    
-                    // 如果主题相同，按课时排序（使用自定义顺序）
-                    if (a.session && b.session) {
-                        return getSessionOrder(a.session) - getSessionOrder(b.session);
-                    }
-                    
-                    // 如果一个有课时一个没有，有课时的优先
-                    if (a.session) return -1;
-                    if (b.session) return 1;
-                    
-                    // 最后按开始日期排序
-                    return parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime();
-                }); 
-                
-                return { 
-                    teacher, 
-                    tasks, 
-                    taskCount: tasks.length, 
-                    minDate: new Date(Math.min(...tasks.map(t => parseDate(t.courseStart).getTime()))) 
-                }; 
+          const groupedTasks = tasksToRender.reduce((acc,t)=>{ (acc[t.teacher]=acc[t.teacher]||[]).push(t); return acc; },{});
+          const sortedTeachers = Object.keys(groupedTasks).map(teacher=>{
+            const tasks = groupedTasks[teacher];
+            tasks.sort((a,b)=>{
+              const topicCompare = getTopicOrder(a.topic) - getTopicOrder(b.topic);
+              if (topicCompare!==0) return topicCompare;
+              if (a.session && b.session) return getSessionOrder(a.session) - getSessionOrder(b.session);
+              if (a.session) return -1; if (b.session) return 1;
+              return parseDate(a.sessionStart).getTime() - parseDate(b.sessionStart).getTime();
             });
-            
-            sortedTeachers.sort((a, b) => { 
-                if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount; 
-                return a.minDate.getTime() - b.minDate.getTime(); 
-            });
-            
-            // 绘制教师任务
-            sortedTeachers.forEach(({ teacher, tasks }) => {
-                const isGroupCollapsed = collapsedGroups.has(teacher);
-                
-                // 绘制组标题行（始终显示）
-                const groupHeaderEl = document.createElement('div'); 
-                groupHeaderEl.className = `gantt-task-group-header`; 
-                groupHeaderEl.innerHTML = `<span class="toggle-icon">${isGroupCollapsed ? '►' : '▼'}</span>${teacher}`; 
-                groupHeaderEl.dataset.rowIndex = displayRowIndex; 
-                groupHeaderEl.dataset.groupName = teacher; 
-                groupHeaderEl.addEventListener('click', () => toggleGroup(teacher)); 
-                ganttTasksContainer.appendChild(groupHeaderEl);
-                
-                const headerRowEl = document.createElement('div'); 
-                headerRowEl.className = 'gantt-row group-header-row'; 
-                headerRowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; 
-                headerRowEl.dataset.rowIndex = displayRowIndex; 
-                ganttRows.appendChild(headerRowEl);
-                
-                displayRowIndex++; // 组标题行算一行
-                
-                // 只有当组未折叠时才绘制任务
-                if (!isGroupCollapsed) {
-                    tasks.forEach(task => {
-                        const taskItemEl = document.createElement('div'); 
-                        taskItemEl.className = 'gantt-task-item'; 
-                        taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session || ''}</div>`; 
-                        taskItemEl.dataset.rowIndex = displayRowIndex; 
-                        taskItemEl.dataset.groupName = teacher; 
-                        ganttTasksContainer.appendChild(taskItemEl);
-                        
-                        const rowEl = document.createElement('div'); 
-                        rowEl.className = 'gantt-row'; 
-                        rowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; 
-                        rowEl.dataset.rowIndex = displayRowIndex; 
-                        rowEl.dataset.groupName = teacher; 
-                        ganttRows.appendChild(rowEl);
-                        
-                        // 计算课程条位置
-                        const courseStartOffset = diffDays(minDate, parseDate(task.courseStart)); 
-                        const courseDuration = diffDays(parseDate(task.courseStart), parseDate(task.courseEnd)) + 1;
-                        
-                        const courseBar = document.createElement('div'); 
-                        courseBar.className = 'gantt-bar gantt-bar-course'; 
-                        courseBar.style.top = `${displayRowIndex * 50}px`;
-                        courseBar.style.left = `${courseStartOffset * dayWidth}px`; 
-                        courseBar.style.width = `${courseDuration * dayWidth}px`; 
-                        courseBar.style.backgroundColor = topicColors[task.topic];
-                        courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
-                        courseBar.dataset.rowIndex = displayRowIndex; 
-                        courseBar.dataset.groupName = teacher; 
-                        ganttRows.appendChild(courseBar); 
-                        addInteractionListeners(task, courseBar, true);
-                        
-                        if (task.sessionStart && task.sessionEnd) {
-                            const sessionStartOffset = diffDays(minDate, parseDate(task.sessionStart)); 
-                            const sessionDuration = diffDays(parseDate(task.sessionStart), parseDate(task.sessionEnd)) + 1;
-                            
-                            const sessionBar = document.createElement('div'); 
-                            sessionBar.className = 'gantt-bar gantt-bar-session'; 
-                            sessionBar.style.top = `${displayRowIndex * 50}px`;
-                            sessionBar.style.left = `${sessionStartOffset * dayWidth}px`; 
-                            sessionBar.style.width = `${sessionDuration * dayWidth}px`; 
-                            sessionBar.style.backgroundColor = topicColors[task.topic];
-                            sessionBar.textContent = task.session || '';
-                            sessionBar.dataset.rowIndex = displayRowIndex; 
-                            sessionBar.dataset.groupName = teacher; 
-                            ganttRows.appendChild(sessionBar); 
-                            addInteractionListeners(task, sessionBar, false);
-                        }
-                        
-                        displayRowIndex++; // 每个任务一行
-                    });
+            return { teacher, tasks, taskCount: tasks.length, minDate: new Date(Math.min(...tasks.map(t=>parseDate(t.courseStart).getTime()))) };
+          });
+          sortedTeachers.sort((a,b)=> b.taskCount!==a.taskCount ? b.taskCount-a.taskCount : a.minDate-b.minDate);
+
+          sortedTeachers.forEach(({teacher,tasks})=>{
+            const isGroupCollapsed = collapsedGroups.has(teacher);
+            const groupHeaderEl = document.createElement('div'); groupHeaderEl.className='gantt-task-group-header';
+            groupHeaderEl.innerHTML = `<span class="toggle-icon">${isGroupCollapsed ? '►' : '▼'}</span>${teacher}`;
+            groupHeaderEl.dataset.rowIndex = displayRowIndex; groupHeaderEl.dataset.groupName = teacher;
+            groupHeaderEl.addEventListener('click', ()=>toggleGroup(teacher));
+            ganttTasksContainer.appendChild(groupHeaderEl);
+            const headerRowEl = document.createElement('div'); headerRowEl.className='gantt-row group-header-row';
+            headerRowEl.style.width = `${(diffDays(minDate, maxDate)+1) * dayWidth}px`;
+            headerRowEl.dataset.rowIndex = displayRowIndex; ganttRows.appendChild(headerRowEl);
+            displayRowIndex++;
+            if (!isGroupCollapsed) {
+              tasks.forEach(task=>{
+                const taskItemEl = document.createElement('div'); taskItemEl.className='gantt-task-item';
+                taskItemEl.innerHTML = `<div class="task-topic">${task.topic}</div><div class="task-session">${task.session || ''}</div>`;
+                taskItemEl.dataset.rowIndex = displayRowIndex; taskItemEl.dataset.groupName = teacher;
+                ganttTasksContainer.appendChild(taskItemEl);
+                const rowEl = document.createElement('div'); rowEl.className='gantt-row';
+                rowEl.style.width = `${(diffDays(minDate, maxDate)+1) * dayWidth}px`;
+                rowEl.dataset.rowIndex = displayRowIndex; rowEl.dataset.groupName = teacher; ganttRows.appendChild(rowEl);
+                const parseD = (str)=> new Date(Date.UTC(...str.split('-').map((n,i)=> i===1? n-1:n)));
+                const courseStartOffset = diffDays(minDate, parseD(task.courseStart));
+                const courseDuration = diffDays(parseD(task.courseStart), parseD(task.courseEnd)) + 1;
+                const courseBar = document.createElement('div'); courseBar.className='gantt-bar gantt-bar-course';
+                courseBar.style.top = `${displayRowIndex * 50}px`;
+                courseBar.style.left = `${courseStartOffset * dayWidth}px`;
+                courseBar.style.width = `${courseDuration * dayWidth}px`;
+                courseBar.style.backgroundColor = topicColors[task.topic];
+                courseBar.innerHTML = `<span class="gantt-bar-course-label">开课</span><span class="gantt-bar-course-text">${task.topic}</span><span class="gantt-bar-course-label">结课</span>`;
+                courseBar.dataset.rowIndex = displayRowIndex; courseBar.dataset.groupName = teacher; ganttRows.appendChild(courseBar);
+                addInteractionListeners(task, courseBar, true);
+                if (task.sessionStart && task.sessionEnd) {
+                  const sessionStartOffset = diffDays(minDate, parseD(task.sessionStart));
+                  const sessionDuration = diffDays(parseD(task.sessionStart), parseD(task.sessionEnd)) + 1;
+                  const sessionBar = document.createElement('div'); sessionBar.className='gantt-bar gantt-bar-session';
+                  sessionBar.style.top = `${displayRowIndex * 50}px`;
+                  sessionBar.style.left = `${sessionStartOffset * dayWidth}px`;
+                  sessionBar.style.width = `${sessionDuration * dayWidth}px`;
+                  sessionBar.style.backgroundColor = topicColors[task.topic];
+                  sessionBar.textContent = task.session || '';
+                  sessionBar.dataset.rowIndex = displayRowIndex; sessionBar.dataset.groupName = teacher; ganttRows.appendChild(sessionBar);
+                  addInteractionListeners(task, sessionBar, false);
                 }
-            });
-        }
-        
-        // 渲染学生数据
-        if (currentViewMode !== 'teacher-only' && studySessionsToRender.length > 0) {
-            // 按学生分组
-            const groupedByStudent = {};
-            
-            studySessionsToRender.forEach(session => {
-                if (!groupedByStudent[session.studentName]) {
-                    groupedByStudent[session.studentName] = [];
-                }
-                groupedByStudent[session.studentName].push(session);
-            });
-            
-            // 渲染每个学生的数据
-            Object.entries(groupedByStudent).forEach(([studentName, sessions]) => {
-                // 排序学生的学习记录（使用自定义顺序）
-                sessions.sort((a, b) => {
-                    // 首先按主题排序（使用自定义顺序）
-                    const topicCompare = getTopicOrder(a.topic || '') - getTopicOrder(b.topic || '');
-                    if (topicCompare !== 0) return topicCompare;
-                    
-                    // 然后按课时排序（使用自定义顺序）
-                    if (a.session && b.session) {
-                        return getSessionOrder(a.session) - getSessionOrder(b.session);
-                    } else if (a.session) {
-                        return -1;
-                    } else if (b.session) {
-                        return 1;
-                    }
-                    
-                    // 最后按开始日期排序
-                    return (a.startTime || '').localeCompare(b.startTime || '');
-                });
-                
-                const studentGroupId = `student_${studentName}`;
-                const isGroupCollapsed = collapsedGroups.has(studentGroupId);
-                
-                // 创建学生组标题行
-                const groupHeaderEl = document.createElement('div'); 
-                groupHeaderEl.className = `gantt-task-group-header`; 
-                groupHeaderEl.innerHTML = `<span class="toggle-icon">${isGroupCollapsed ? '►' : '▼'}</span>${studentName} (学生)`; 
-                groupHeaderEl.dataset.rowIndex = displayRowIndex; 
-                groupHeaderEl.dataset.groupName = studentGroupId; 
-                groupHeaderEl.addEventListener('click', () => toggleGroup(studentGroupId)); 
-                ganttTasksContainer.appendChild(groupHeaderEl);
-                
-                const headerRowEl = document.createElement('div'); 
-                headerRowEl.className = 'gantt-row group-header-row'; 
-                headerRowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; 
-                headerRowEl.dataset.rowIndex = displayRowIndex; 
-                ganttRows.appendChild(headerRowEl);
-                
                 displayRowIndex++;
-                
-                // 仅当组未折叠时才渲染学习记录
-                if (!isGroupCollapsed) {
-                    sessions.forEach(session => {
-                        if (!session.startTime || !session.endTime) return; // 跳过没有日期的记录
-                        
-                        const taskItemEl = document.createElement('div'); 
-                        taskItemEl.className = 'gantt-task-item'; 
-                        taskItemEl.innerHTML = `<div class="task-topic">${session.topic || '未指定主题'}</div>
-                                                <div class="task-session">${session.session || '未指定课时'} (学习记录)</div>`; 
-                        taskItemEl.dataset.rowIndex = displayRowIndex; 
-                        taskItemEl.dataset.groupName = studentGroupId; 
-                        ganttTasksContainer.appendChild(taskItemEl);
-                        
-                        const rowEl = document.createElement('div'); 
-                        rowEl.className = 'gantt-row'; 
-                        rowEl.style.width = `${(diffDays(minDate, maxDate) + 1) * dayWidth}px`; 
-                        rowEl.dataset.rowIndex = displayRowIndex; 
-                        rowEl.dataset.groupName = studentGroupId; 
-                        ganttRows.appendChild(rowEl);
-                        
-                        // 学习时间条
-                        const studyStartOffset = diffDays(minDate, parseDate(session.startTime)); 
-                        const studyDuration = diffDays(parseDate(session.startTime), parseDate(session.endTime)) + 1;
-                        
-                        const studyBar = document.createElement('div'); 
-                        studyBar.className = `gantt-bar gantt-bar-student ${session.completed ? 'completed' : ''}`; 
-                        studyBar.style.top = `${displayRowIndex * 50}px`;
-                        studyBar.style.left = `${studyStartOffset * dayWidth}px`; 
-                        studyBar.style.width = `${studyDuration * dayWidth}px`; 
-                        studyBar.style.backgroundColor = topicColors[session.topic] || '#3498db'; // 使用主题颜色或默认蓝色
-                        studyBar.textContent = session.session || '';
-                        studyBar.dataset.rowIndex = displayRowIndex; 
-                        studyBar.dataset.groupName = studentGroupId; 
-                        ganttRows.appendChild(studyBar);
-                        
-                        // 添加交互监听
-                        addStudyInteractionListeners(session, studyBar);
-                        
-                        displayRowIndex++;
-                    });
-                }
+              });
+            }
+          });
+        }
+
+        if (currentViewMode !== 'teacher-only' && studySessionsToRender.length > 0) {
+          const groupedByStudent = {};
+          studySessionsToRender.forEach(s => { (groupedByStudent[s.studentName]=groupedByStudent[s.studentName]||[]).push(s); });
+          Object.entries(groupedByStudent).forEach(([studentName, sessions])=>{
+            sessions.sort((a,b)=>{
+              const t = getTopicOrder(a.topic||'') - getTopicOrder(b.topic||''); if (t!==0) return t;
+              if (a.session && b.session) return getSessionOrder(a.session) - getSessionOrder(b.session);
+              if (a.session) return -1; if (b.session) return 1;
+              return (a.startTime||'').localeCompare(b.startTime||'');
             });
+            const studentGroupId = `student_${studentName}`;
+            const isGroupCollapsed = collapsedGroups.has(studentGroupId);
+            const groupHeaderEl = document.createElement('div'); groupHeaderEl.className='gantt-task-group-header';
+            groupHeaderEl.innerHTML = `<span class="toggle-icon">${isGroupCollapsed ? '►' : '▼'}</span>${studentName} (学生)`;
+            groupHeaderEl.dataset.rowIndex = displayRowIndex; groupHeaderEl.dataset.groupName = studentGroupId;
+            groupHeaderEl.addEventListener('click', ()=>toggleGroup(studentGroupId));
+            ganttTasksContainer.appendChild(groupHeaderEl);
+            const headerRowEl = document.createElement('div'); headerRowEl.className='gantt-row group-header-row';
+            headerRowEl.style.width = `${(diffDays(minDate, maxDate)+1) * dayWidth}px`; headerRowEl.dataset.rowIndex = displayRowIndex; ganttRows.appendChild(headerRowEl);
+            displayRowIndex++;
+            if (!isGroupCollapsed) {
+              const parseD = (str)=> new Date(Date.UTC(...str.split('-').map((n,i)=> i===1? n-1:n)));
+              sessions.forEach(s=>{
+                if (!s.startTime || !s.endTime) return;
+                const taskItemEl = document.createElement('div'); taskItemEl.className='gantt-task-item';
+                taskItemEl.innerHTML = `<div class="task-topic">${s.topic || '未指定主题'}</div><div class="task-session">${s.session || '未指定课时'} (学习记录)</div>`;
+                taskItemEl.dataset.rowIndex = displayRowIndex; taskItemEl.dataset.groupName = studentGroupId; ganttTasksContainer.appendChild(taskItemEl);
+                const rowEl = document.createElement('div'); rowEl.className='gantt-row';
+                rowEl.style.width = `${(diffDays(minDate, maxDate)+1) * dayWidth}px`;
+                rowEl.dataset.rowIndex = displayRowIndex; rowEl.dataset.groupName = studentGroupId; ganttRows.appendChild(rowEl);
+                const studyStartOffset = diffDays(minDate, parseD(s.startTime));
+                const studyDuration = diffDays(parseD(s.startTime), parseD(s.endTime)) + 1;
+                const studyBar = document.createElement('div'); studyBar.className = `gantt-bar gantt-bar-student ${s.completed ? 'completed' : ''}`;
+                studyBar.style.top = `${displayRowIndex * 50}px`;
+                studyBar.style.left = `${studyStartOffset * dayWidth}px`;
+                studyBar.style.width = `${studyDuration * dayWidth}px`;
+                studyBar.style.backgroundColor = topicColors[s.topic] || '#3498db';
+                studyBar.textContent = s.session || '';
+                studyBar.dataset.rowIndex = displayRowIndex; studyBar.dataset.groupName = studentGroupId; ganttRows.appendChild(studyBar);
+                addStudyInteractionListeners(s, studyBar);
+                displayRowIndex++;
+              });
+            }
+          });
         }
-        
-        // 今日线显示
-        const today = new Date(); 
-        const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-        if (todayUTC >= minDate && todayUTC <= maxDate) { 
-            const todayLine = document.createElement('div'); 
-            todayLine.className = 'gantt-today-line';
-            const todayOffset = diffDays(minDate, todayUTC); 
-            todayLine.style.left = `${(todayOffset * dayWidth) + (dayWidth / 2)}px`;
-            todayLine.style.display = 'block';
-            ganttRows.appendChild(todayLine);
-        }
-        
-        // 设置网格线高度
+
+        // 调整网格线高度
         const ganttGridLinesEl = ganttRows.querySelector('.gantt-grid-lines');
         if (ganttGridLinesEl) {
-            // 计算实际显示的总高度
-            const visibleRowsHeight = displayRowIndex * 50; // 每行50px
-            ganttGridLinesEl.style.height = `${visibleRowsHeight}px`;
-            
-            // 确保每条网格线都有正确的高度
-            const gridLines = ganttGridLinesEl.querySelectorAll('.gantt-grid-line');
-            gridLines.forEach(line => {
-                line.style.height = `${visibleRowsHeight}px`;
-            });
-            
-            // 今日线也需要正确高度
-            if (todayUTC >= minDate && todayUTC <= maxDate) {
-                const todayLine = ganttRows.querySelector('.gantt-today-line');
-                if (todayLine) {
-                    todayLine.style.height = `${visibleRowsHeight}px`;
-                }
-            }
+          const visibleRowsHeight = (ganttRows.querySelectorAll('.gantt-row').length) * 50;
+          ganttGridLinesEl.style.height = `${visibleRowsHeight}px`;
+          ganttGridLinesEl.querySelectorAll('.gantt-grid-line').forEach(line => line.style.height = `${visibleRowsHeight}px`);
         }
-        
-        // 添加SVG网格增强（可选）
-        addSVGGrid(ganttRows, (diffDays(minDate, maxDate) + 1) * dayWidth, displayRowIndex * 50);
-        
-        // 移除用户选择器
-        const userSelector = document.querySelector('.user-selector');
-        if (userSelector) {
-            userSelector.remove();
-        }
-    }
-    
-    // 添加SVG网格增强
-    function addSVGGrid(container, width, height) {
-        // 检查是否已经存在SVG网格
-        const existingSvg = container.querySelector('.grid-svg');
-        if (existingSvg) {
-            existingSvg.remove();
-        }
-        
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("class", "grid-svg");
-        svg.setAttribute("width", width);
-        svg.setAttribute("height", height);
-        svg.style.position = "absolute";
-        svg.style.top = "0";
-        svg.style.left = "0";
-        svg.style.pointerEvents = "none";
-        svg.style.zIndex = "0";
-        
-        // 创建垂直网格线
-        for (let x = 0; x <= width; x += dayWidth) {
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute("x1", x);
-            line.setAttribute("y1", 0);
-            line.setAttribute("x2", x);
-            line.setAttribute("y2", height);
-            line.setAttribute("stroke", "#e0e0e0");
-            line.setAttribute("stroke-width", "1");
-            line.setAttribute("stroke-dasharray", "2,2");
-            svg.appendChild(line);
-        }
-        
-        // 创建水平网格线
-        for (let y = 0; y <= height; y += 50) { // 50px为每行高度
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute("x1", 0);
-            line.setAttribute("y1", y);
-            line.setAttribute("x2", width);
-            line.setAttribute("y2", y);
-            line.setAttribute("stroke", "#f0f0f0");
-            line.setAttribute("stroke-width", "1");
-            svg.appendChild(line);
-        }
-        
-        container.appendChild(svg);
-    }
-    
-    // 页面加载时，自动执行数据加载和初始化函数
-    loadDataAndInitialize();
-    
-    // 处理页面切换时移除用户选择器
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible') {
-            console.log('页面变为可见，重新加载数据');
-            // 重新获取数据
-            database.ref('taskCheckStatus').once('value', (snapshot) => {
-                checkStatus = snapshot.val() || {};
-                if (currentView === 'calendar') {
-                    applyFilters();
-                }
-            });
-        }
-    });
-});
-</script>
+      }
 
+      function addSVGGrid() {}
+
+      loadDataAndInitialize();
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') {
+          database.ref('taskCheckStatus').once('value', (snapshot) => {
+            checkStatus = snapshot.val() || {};
+            if (currentView === 'calendar') applyFilters();
+          });
+        }
+      });
+    });
+  </script>
 </body>
 </html>
