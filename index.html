@@ -1386,7 +1386,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.prepend(checkContainer);
                             
                             marker.appendChild(document.createTextNode(
-                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (开)`
+                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (备)`
                             ));
                             
                             addInteractionListeners(task, marker, true); 
@@ -1445,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.prepend(checkContainer);
                             
                             marker.appendChild(document.createTextNode(
-                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (结)`
+                                `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} (关)`
                             ));
                             
                             addInteractionListeners(task, marker, true); 
