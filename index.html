@@ -515,7 +515,6 @@
             display: none;
         }
         
-        /* <!-- 新增CSS --> */
         /* 这是为新功能添加的CSS样式 */
         .calendar-text-note {
             font-size: 12px;
@@ -1638,25 +1637,25 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // [新增功能开始]
+        // [新增功能开始 - 已修正]
         // 此处添加教师课程的起始/结束日期文字注记
         if (currentViewMode !== 'student-only') {
             const startNotesSet = new Set();
             const endNotesSet = new Set();
             
             tasksToRender.forEach(task => {
-                // 确保课程有起止日期
-                if (!task.courseStart || !task.courseEnd) return;
+                // 修正：确保课时有起止日期 (sessionStart, sessionEnd)
+                if (!task.sessionStart || !task.sessionEnd) return;
 
-                const courseStartDate = new Date(task.courseStart + 'T00:00:00');
-                const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
+                const sessionStartDate = new Date(task.sessionStart + 'T00:00:00');
+                const sessionEndDate = new Date(task.sessionEnd + 'T00:00:00');
 
-                // 1. 处理起始日期注记
-                if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
+                // 1. 处理起始日期注记 ("起始日期" -> sessionStart)
+                if (sessionStartDate.getFullYear() === year && sessionStartDate.getMonth() === month) {
                     // 创建唯一键以防重复添加
-                    const key = `${task.teacher}|${task.topic}|${task.session}|${task.courseStart}|up`;
+                    const key = `${task.teacher}|${task.topic}|${task.session}|${task.sessionStart}|up`;
                     if (!startNotesSet.has(key)) {
-                        const startCell = grid.querySelector(`.calendar-day[data-date="${task.courseStart}"]`);
+                        const startCell = grid.querySelector(`.calendar-day[data-date="${task.sessionStart}"]`);
                         if (startCell) {
                             const note = document.createElement('div');
                             note.className = 'calendar-text-note';
@@ -1674,12 +1673,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 
-                // 2. 处理结束日期注记
-                if (courseEndDate.getFullYear() === year && courseEndDate.getMonth() === month) {
+                // 2. 处理结束日期注记 ("结束日期" -> sessionEnd)
+                if (sessionEndDate.getFullYear() === year && sessionEndDate.getMonth() === month) {
                     // 创建唯一键以防重复添加
-                    const key = `${task.teacher}|${task.topic}|${task.session}|${task.courseEnd}|down`;
+                    const key = `${task.teacher}|${task.topic}|${task.session}|${task.sessionEnd}|down`;
                     if (!endNotesSet.has(key)) {
-                        const endCell = grid.querySelector(`.calendar-day[data-date="${task.courseEnd}"]`);
+                        const endCell = grid.querySelector(`.calendar-day[data-date="${task.sessionEnd}"]`);
                         if (endCell) {
                             const note = document.createElement('div');
                             note.className = 'calendar-text-note';
