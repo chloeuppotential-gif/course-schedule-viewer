@@ -715,7 +715,29 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const ganttViewBtn = document.getElementById('gantt-view-btn');
     const calendarViewBtn = document.getElementById('calendar-view-btn');
-    
+
+    // --- 新增：Teaching / Learning 模块切换按钮 ---
+const teachingBtn = document.getElementById('teaching-btn');
+const learningBtn = document.getElementById('learning-btn');
+
+teachingBtn.addEventListener('click', () => {
+    if (currentMainSection === 'teaching') return;
+    currentMainSection = 'teaching';
+    teachingBtn.classList.add('active');
+    learningBtn.classList.remove('active');
+    currentViewMode = 'teacher-only';
+    applyFilters();
+});
+
+learningBtn.addEventListener('click', () => {
+    if (currentMainSection === 'learning') return;
+    currentMainSection = 'learning';
+    learningBtn.classList.add('active');
+    teachingBtn.classList.remove('active');
+    currentViewMode = 'student-only';
+    applyFilters();
+});
+
     const lastUpdatedTimeElement = document.getElementById('last-updated-time');
     const currentTimeElement = document.getElementById('current-time');
     
