@@ -63,6 +63,26 @@
         .view-switcher { margin-left: 20px; display: flex; gap: 5px; border: 1px solid #ccc; border-radius: 5px; padding: 2px; }
         .view-switcher button { background: transparent; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-size: 0.9em; }
         .view-switcher button.active { background-color: var(--primary-color); color: white; }
+        .main-content-switcher {
+    margin-left: 25px;
+    display: flex;
+    gap: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 2px;
+}
+.main-content-switcher button {
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.main-content-switcher button.active {
+    background-color: var(--primary-color);
+    color: white;
+}
         .control-panel .spacer { flex-grow: 1; }
         #error-message { color: var(--danger-color); height: 1em; margin: 0; padding: 0 10px; }
 
@@ -534,6 +554,11 @@
             <button id="gantt-view-btn" class="active">甘特图</button>
             <button id="calendar-view-btn">日历</button>
         </div>
+        <!-- 新增：教学/学习模块切换 -->
+<div class="main-content-switcher">
+    <button id="teaching-btn" class="active">Teaching Materials</button>
+    <button id="learning-btn">Learning Materials</button>
+</div>
         
         <!-- 添加视图模式切换 -->
         <div class="view-mode-selector">
@@ -666,6 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let dayWidth = 40;
     const collapsedGroups = new Set();
     let currentViewMode = 'all';  // 当前视图模式：all, teacher-only, student-only
+    let currentMainSection = 'teaching'; // 新增：teaching 或 learning
 
     let currentView = 'gantt';
     let currentDisplayDate = new Date(); // 默认显示今天
@@ -914,6 +940,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 获取当前选择的筛选条件
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
+        // 👉 应用主模块模式过滤
+if (currentMainSection === 'teaching') {
+    currentViewMode = 'teacher-only';
+    document.querySelector('input[name="view-mode"][value="teacher-only"]').checked = true;
+} else if (currentMainSection === 'learning') {
+    currentViewMode = 'student-only';
+    document.querySelector('input[name="view-mode"][value="student-only"]').checked = true;
+}
+updateFilterVisibility();
         const currentSelectedStudent = filterStudent.value || '所有学生';
         const currentSelectedTopic = filterTopic.value || '所有主题';
         const currentSelectedSession = filterSession.value || '所有课时'; 
