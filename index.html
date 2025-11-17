@@ -949,6 +949,14 @@ if (currentMainSection === 'teaching') {
     document.querySelector('input[name="view-mode"][value="student-only"]').checked = true;
 }
 updateFilterVisibility();
+        if (currentMainSection === 'teaching') {
+    currentViewMode = 'teacher-only';
+    document.querySelector('input[name="view-mode"][value="teacher-only"]').checked = true;
+} else if (currentMainSection === 'learning') {
+    currentViewMode = 'student-only';
+    document.querySelector('input[name="view-mode"][value="student-only"]').checked = true;
+}
+updateFilterVisibility();
         const currentSelectedStudent = filterStudent.value || '所有学生';
         const currentSelectedTopic = filterTopic.value || '所有主题';
         const currentSelectedSession = filterSession.value || '所有课时'; 
