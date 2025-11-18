@@ -753,6 +753,14 @@ learningBtn.addEventListener('click', () => {
         }
     }
     
+    // 添加视图模式选择监听
+document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    currentViewMode = this.value;
+    updateFilterVisibility();
+    applyFilters();
+  });
+});
     // 更新当前时间显示
     function updateCurrentTime() {
         const now = new Date();
