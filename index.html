@@ -1291,46 +1291,57 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
                                 marker.className = 'calendar-marker marker-single-day';
                             }
                             
-                            // 为信息老师添加第二天的 progress check
-                if (isInfoTeacher) {
+// 为信息老师添加第二天的 progress check
+if (isInfoTeacher) {
     const nextDayDate = new Date(courseStartDate);
     console.log('🔍 检测到信息老师课程:', task);
     nextDayDate.setDate(nextDayDate.getDate() + 1);
-    console.log('📅 第二天日期:', nextDayDate, 'year:', year, 'month:', month);
-    console.log('🔍 检查条件:', {
-    nextDayYear: nextDayDate.getFullYear(),
-    year: year,
-    nextDayMonth: nextDayDate.getMonth(),
-    month: month,
-    匹配: nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month
-});
-    if (nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month) {
-        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
-        const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
-        console.log('🔎 查找格子 nextDayStr:', nextDayStr, '找到格子:', nextDayCell);
-        
-        if (nextDayCell) {
-            console.log('✅ 准备添加 progress check');
-            const progressCheckDiv = document.createElement('div');
-            progressCheckDiv.className = 'progress-check-item';
-            progressCheckDiv.style.fontSize = '0.85em';
-            progressCheckDiv.style.color = '#666';
-            progressCheckDiv.style.marginTop = '5px';
-            progressCheckDiv.innerHTML = `
-                <label style="cursor: pointer;">
-                    <input type="checkbox" 
-                           data-task-id="${taskId}-progress"
-                           class="progress-check-box"
-                           style="margin-right: 5px;">
-                    ${task.teacher} - ${task.topic}${task.session} - progress check
-                </label>
-            `;
-            nextDayCell.appendChild(progressCheckDiv);
-        } else {
-            console.log('❌ 没找到第二天的格子');
-        }
+
+    // ✅ 不再限制月份，仅检查格子是否存在
+    const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
+    const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+    console.log('📅 检查第二天格子:', nextDayStr, '找到格子:', !!nextDayCell);
+
+    if (nextDayCell) {
+        console.log('✅ 添加 progress check 至:', nextDayStr);
+        const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
+        const progressCheckDiv = document.createElement('div');
+        progressCheckDiv.className = 'calendar-marker marker-info-teacher';
+        progressCheckDiv.style.marginTop = '5px';
+        progressCheckDiv.textContent = `${task.teacher} - ${task.topic}${task.session || ''} - Progress Check`;
+
+        // 支持多用户复选框
+        const taskChecks = checkStatus[taskId] || {};
+        const checkContainer = document.createElement('div');
+        checkContainer.className = 'multi-checkbox';
+
+        users.forEach(user => {
+            const isChecked = !!taskChecks[user.id];
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'checkbox-container';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'user-checkbox';
+            checkbox.dataset.userId = user.id;
+            checkbox.checked = isChecked;
+
+            const checkboxDisplay = document.createElement('div');
+            checkboxDisplay.className = `checkbox-display ${user.id}`;
+            checkbox.addEventListener('change', function() {
+                const checked = checkbox.checked;
+                saveMultiUserCheckStatus(taskId, user.id, checked);
+                if (checked) showFeedback(progressCheckDiv, user.id);
+            });
+
+            checkboxContainer.appendChild(checkbox);
+            checkboxContainer.appendChild(checkboxDisplay);
+            checkContainer.appendChild(checkboxContainer);
+        });
+
+        progressCheckDiv.prepend(checkContainer);
+        nextDayCell.appendChild(progressCheckDiv);
     } else {
-        console.log('❌ 第二天不在当前月份');
+        console.log('⚠️ 第二天不在当前日历视图范围，跳过');
     }
 }
                             const taskChecks = checkStatus[taskId] || {};
