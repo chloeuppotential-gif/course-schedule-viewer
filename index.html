@@ -561,12 +561,6 @@
 </div>
         
         <!-- 添加视图模式切换 -->
-        <div class="view-mode-group">
-  <label><input type="radio" name="view-mode" value="all" checked> 所有数据</label>
-  <label><input type="radio" name="view-mode" value="teacher-only"> 仅教师课程</label>
-  <label><input type="radio" name="view-mode" value="student-only"> 仅学生学习</label>
-</div>
-        
         <div class="spacer"></div>
         <p id="error-message">正在加载数据...</p>
     </div>
@@ -962,14 +956,6 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
         // 获取当前选择的筛选条件
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
         // 👉 应用主模块模式过滤
-if (currentMainSection === 'teaching') {
-    currentViewMode = 'teacher-only';
-    document.querySelector('input[name="view-mode"][value="teacher-only"]').checked = true;
-} else if (currentMainSection === 'learning') {
-    currentViewMode = 'student-only';
-    document.querySelector('input[name="view-mode"][value="student-only"]').checked = true;
-}
-updateFilterVisibility();
         if (currentMainSection === 'teaching') {
     currentViewMode = 'teacher-only';
     document.querySelector('input[name="view-mode"][value="teacher-only"]').checked = true;
