@@ -816,7 +816,7 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
         }, 200);
     }
     
-function loadDataAndInitialize() {
+    function loadDataAndInitialize() {
     // 加载教师数据
     fetch('data.json')
         .then(response => {
@@ -861,7 +861,7 @@ function loadDataAndInitialize() {
     renderEmpty();
 });
 }
-
+    
     // 修改的populateFilterDropdown函数
     function populateFilterDropdown(selectElement, options, currentlySelected, defaultOption = null) {
         // 确保默认选项（如'所有教师'）始终在第一位
