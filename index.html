@@ -912,18 +912,21 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
             renderEmpty();
             return;
         }
+       
+        // 👉 应用主模块模式过滤
+if (currentMainSection === 'teaching') {
+    currentViewMode = 'teacher-only';
+    const teacherRadio = document.querySelector('input[name="view-mode"][value="teacher-only"]');
+    if (teacherRadio) teacherRadio.checked = true;
+} else if (currentMainSection === 'learning') {
+    currentViewMode = 'student-only';
+    const studentRadio = document.querySelector('input[name="view-mode"][value="student-only"]');
+    if (studentRadio) studentRadio.checked = true;
+}
+updateFilterVisibility();
         
         // 获取当前选择的筛选条件
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
-        // 👉 应用主模块模式过滤
-        if (currentMainSection === 'teaching') {
-    currentViewMode = 'teacher-only';
-    document.querySelector('input[name="view-mode"][value="teacher-only"]').checked = true;
-} else if (currentMainSection === 'learning') {
-    currentViewMode = 'student-only';
-    document.querySelector('input[name="view-mode"][value="student-only"]').checked = true;
-}
-updateFilterVisibility();
         const currentSelectedStudent = filterStudent.value || '所有学生';
         const currentSelectedTopic = filterTopic.value || '所有主题';
         const currentSelectedSession = filterSession.value || '所有课时'; 
