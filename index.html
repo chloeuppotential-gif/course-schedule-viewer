@@ -912,18 +912,7 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
             renderEmpty();
             return;
         }
-       
-        // 👉 应用主模块模式过滤
-if (currentMainSection === 'teaching') {
-    currentViewMode = 'teacher-only';
-    const teacherRadio = document.querySelector('input[name="view-mode"][value="teacher-only"]');
-    if (teacherRadio) teacherRadio.checked = true;
-} else if (currentMainSection === 'learning') {
-    currentViewMode = 'student-only';
-    const studentRadio = document.querySelector('input[name="view-mode"][value="student-only"]');
-    if (studentRadio) studentRadio.checked = true;
-}
-updateFilterVisibility();
+    
         
         // 获取当前选择的筛选条件
         const currentSelectedTeacher = filterTeacher.value || '所有教师';
