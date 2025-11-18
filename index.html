@@ -1297,7 +1297,13 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
     console.log('🔍 检测到信息老师课程:', task);
     nextDayDate.setDate(nextDayDate.getDate() + 1);
     console.log('📅 第二天日期:', nextDayDate, 'year:', year, 'month:', month);
-    
+    console.log('🔍 检查条件:', {
+    nextDayYear: nextDayDate.getFullYear(),
+    year: year,
+    nextDayMonth: nextDayDate.getMonth(),
+    month: month,
+    匹配: nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month
+});
     if (nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month) {
         const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
         const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
