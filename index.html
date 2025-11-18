@@ -1290,34 +1290,43 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
                             } else {
                                 marker.className = 'calendar-marker marker-single-day';
                             }
+                            
                             // 为信息老师添加第二天的 progress check
                 if (isInfoTeacher) {
-                    const nextDayDate = new Date(courseStartDate);
-                    nextDayDate.setDate(nextDayDate.getDate() + 1);
-                    
-                    if (nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month) {
-                        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
-                        const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
-                        
-                        if (nextDayCell) {
-                            const progressCheckDiv = document.createElement('div');
-                            progressCheckDiv.className = 'progress-check-item';
-                            progressCheckDiv.style.fontSize = '0.85em';
-                            progressCheckDiv.style.color = '#666';
-                            progressCheckDiv.style.marginTop = '5px';
-                            progressCheckDiv.innerHTML = `
-                                <label style="cursor: pointer;">
-                                    <input type="checkbox" 
-                                           data-task-id="${taskId}-progress"
-                                           class="progress-check-box"
-                                           style="margin-right: 5px;">
-                                    ${task.teacher} - ${task.topic}${task.session} - progress check
-                                </label>
-                            `;
-                            nextDayCell.appendChild(progressCheckDiv);
-                        }
-                    }
-                }
+    const nextDayDate = new Date(courseStartDate);
+    console.log('🔍 检测到信息老师课程:', task);
+    nextDayDate.setDate(nextDayDate.getDate() + 1);
+    console.log('📅 第二天日期:', nextDayDate, 'year:', year, 'month:', month);
+    
+    if (nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month) {
+        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
+        const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+        console.log('🔎 查找格子 nextDayStr:', nextDayStr, '找到格子:', nextDayCell);
+        
+        if (nextDayCell) {
+            console.log('✅ 准备添加 progress check');
+            const progressCheckDiv = document.createElement('div');
+            progressCheckDiv.className = 'progress-check-item';
+            progressCheckDiv.style.fontSize = '0.85em';
+            progressCheckDiv.style.color = '#666';
+            progressCheckDiv.style.marginTop = '5px';
+            progressCheckDiv.innerHTML = `
+                <label style="cursor: pointer;">
+                    <input type="checkbox" 
+                           data-task-id="${taskId}-progress"
+                           class="progress-check-box"
+                           style="margin-right: 5px;">
+                    ${task.teacher} - ${task.topic}${task.session} - progress check
+                </label>
+            `;
+            nextDayCell.appendChild(progressCheckDiv);
+        } else {
+            console.log('❌ 没找到第二天的格子');
+        }
+    } else {
+        console.log('❌ 第二天不在当前月份');
+    }
+}
                             const taskChecks = checkStatus[taskId] || {};
                           
 
