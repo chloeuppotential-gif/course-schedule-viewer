@@ -983,8 +983,17 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
                 const topicMatch = (currentSelectedTopic === '所有主题' || task.topic === currentSelectedTopic);
                 const sessionMatch = (currentSelectedSession === '所有课时' || 
                                     (task.session && task.session === currentSelectedSession));
-                const dateMatch = (!dateStart || task.sessionEnd >= dateStart) && 
-                                (!dateEnd || task.sessionStart <= dateEnd);
+                // ✅ 改成支持 courseStart/courseEnd 也能被渲染
+const dateStartValue = dateStart || null;
+const dateEndValue = dateEnd || null;
+
+// 优先使用课时日期，否则退回课程日期
+const taskStart = task.sessionStart || task.courseStart;
+const taskEnd   = task.sessionEnd || task.courseEnd;
+
+const dateMatch =
+  (!dateStartValue || taskEnd >= dateStartValue) &&
+  (!dateEndValue || taskStart <= dateEndValue);
                 return teacherMatch && topicMatch && sessionMatch && dateMatch;
             });
         }
