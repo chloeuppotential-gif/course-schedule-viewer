@@ -1290,8 +1290,37 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
                             } else {
                                 marker.className = 'calendar-marker marker-single-day';
                             }
-                            
+                            // 为信息老师添加第二天的 progress check
+                if (isInfoTeacher) {
+                    const nextDayDate = new Date(courseStartDate);
+                    nextDayDate.setDate(nextDayDate.getDate() + 1);
+                    
+                    if (nextDayDate.getFullYear() === year && nextDayDate.getMonth() === month) {
+                        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
+                        const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+                        
+                        if (nextDayCell) {
+                            const progressCheckDiv = document.createElement('div');
+                            progressCheckDiv.className = 'progress-check-item';
+                            progressCheckDiv.style.fontSize = '0.85em';
+                            progressCheckDiv.style.color = '#666';
+                            progressCheckDiv.style.marginTop = '5px';
+                            progressCheckDiv.innerHTML = `
+                                <label style="cursor: pointer;">
+                                    <input type="checkbox" 
+                                           data-task-id="${taskId}-progress"
+                                           class="progress-check-box"
+                                           style="margin-right: 5px;">
+                                    ${task.teacher} - ${task.topic}${task.session} - progress check
+                                </label>
+                            `;
+                            nextDayCell.appendChild(progressCheckDiv);
+                        }
+                    }
+                }
                             const taskChecks = checkStatus[taskId] || {};
+                          
+
                             
                             const checkContainer = document.createElement('div');
                             checkContainer.className = 'multi-checkbox';
