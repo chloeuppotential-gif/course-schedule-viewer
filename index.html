@@ -816,92 +816,51 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
         }, 200);
     }
     
-    function loadDataAndInitialize() {
-        // 加载教师数据
-        fetch('data.json')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`无法加载 data.json (状态: ${response.status})。请确认后台 Excel 已上传且自动化流程成功运行。`);
-                }
+function loadDataAndInitialize() {
+    // 加载教师数据
+    fetch('data.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`无法加载 data.json (状态: ${response.status})。请确认后台 Excel 已上传且自动化流程成功运行。`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            allTasks = data;
+            errorMessage.textContent = '';
+            
+            // 尝试加载学生数据
+            return fetch('students.json')
+                .catch(err => {
+                    console.warn("无法加载学生数据:", err);
+                    return { ok: false }; // 如果没有学生数据，返回失败状态
+                });
+        })
+        .then(response => {
+            if (response.ok) {
                 return response.json();
-            })
-            .then(data => {
-                allTasks = data;
-                errorMessage.textContent = '';
-                
-                // 尝试加载学生数据
-                return fetch('students.json')
-                    .catch(err => {
-                        console.warn("无法加载学生数据:", err);
-                        return { ok: false }; // 如果没有学生数据，返回失败状态
-                    });
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                } else {
-                    console.warn("学生数据不存在或无法加载，使用空数组");
-                    return [];
-                }
-            })
-            .then(studentData => {
-                students = studentData || [];
-                console.log("已加载学生数据:", students);
-                
-                // 如果无法获取学生数据，创建默认学生
-                if (students.length === 0) {
-                    students = [{
-                        id: "student_同学",
-                        name: "同学",
-                        studySessions: []
-                    }];
-                    
-                    // 从教师数据中提取课时信息，构建默认学习记录
-                    const courses = {};
-                    allTasks.forEach(task => {
-                        const key = `${task.topic}_${task.session}`;
-                        if (!courses[key] && task.topic && task.session) {
-                            courses[key] = {
-                                topic: task.topic,
-                                session: task.session
-                            };
-                        }
-                    });
-                    
-                    // 查看是否可以从数据中识别学习记录
-                    const studySessions = Object.values(courses).map((course, index) => ({
-                        id: `study_${index}`,
-                        topic: course.topic,
-                        session: course.session,
-                        startTime: "", // 这些可能需要根据实际情况设置
-                        endTime: "",
-                        duration: 60,
-                        completed: false,
-                        notes: ""
-                    }));
-                    
-                    students[0].studySessions = studySessions;
-                }
-
-                if (allTasks.length === 0 && students.length === 0) {
-                    throw new Error("加载的数据为空。请检查后台 schedule.xlsx 文件内容是否正确。");
-                }
-                
-                // 设置最后更新时间
-                lastUpdatedTimeElement.textContent = new Date().toLocaleDateString('zh-CN');
-                
-                collapsedGroups.clear();
-                currentDisplayDate = new Date(); // 使用当前日期
-                updateFilterVisibility(); // 初始化筛选器可见性
-                applyFilters(); // ⬅️ 改成直接调用 applyFilters，而不是模拟点击
-errorMessage.textContent = '';  // 清空状态提示
-console.log("✅ 数据加载完成，首次渲染已执行");
-            .catch(err => {
-                errorMessage.textContent = '加载数据失败: ' + err.message;
-                console.error(err);
-                renderEmpty();
-            });
-    }
+            } else {
+                console.warn("学生数据不存在或无法加载，使用空数组");
+                return [];
+            }
+        })
+        .then(studentData => {
+            students = studentData || [];
+            console.log("已加载学生数据:", students);
+            ...
+            collapsedGroups.clear();
+            currentDisplayDate = new Date();
+            updateFilterVisibility();
+            applyFilters();
+            errorMessage.textContent = '';
+            console.log("✅ 数据加载完成，首次渲染已执行");
+        })   // ✅ 补上这个
+        .catch(err => {
+            errorMessage.textContent = '加载数据失败: ' + err.message;
+            console.error(err);
+            renderEmpty();
+        });
+}
 
     // 修改的populateFilterDropdown函数
     function populateFilterDropdown(selectElement, options, currentlySelected, defaultOption = null) {
