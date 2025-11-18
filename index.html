@@ -893,8 +893,9 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
                 collapsedGroups.clear();
                 currentDisplayDate = new Date(); // 使用当前日期
                 updateFilterVisibility(); // 初始化筛选器可见性
-                resetFiltersButton.click(); // 触发第一次渲染
-            })
+                applyFilters(); // ⬅️ 改成直接调用 applyFilters，而不是模拟点击
+errorMessage.textContent = '';  // 清空状态提示
+console.log("✅ 数据加载完成，首次渲染已执行");)
             .catch(err => {
                 errorMessage.textContent = '加载数据失败: ' + err.message;
                 console.error(err);
