@@ -1274,7 +1274,7 @@ document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
                 const courseStartDate = new Date(task.courseStart + 'T00:00:00'); 
                 const courseEndDate = new Date(task.courseEnd + 'T00:00:00');
                 
-                const isInfoTeacher = task.teacher.includes('信息老师') || task.teacher === '信息老师';
+                const isInfoTeacher = task.teacher.includes('信息') || task.teacher === '信息';
                 
                 if (task.courseStart === task.courseEnd) {
                     if (courseStartDate.getFullYear() === year && courseStartDate.getMonth() === month) {
