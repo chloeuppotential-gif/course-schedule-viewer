@@ -561,12 +561,6 @@
 </div>
         
         <!-- 添加视图模式切换 -->
-        <div class="view-mode-selector">
-            <label><input type="radio" name="view-mode" value="all" checked> 所有数据</label>
-            <label><input type="radio" name="view-mode" value="teacher-only"> 仅教师课程</label>
-            <label><input type="radio" name="view-mode" value="student-only"> 仅学生学习</label>
-        </div>
-        
         <div class="spacer"></div>
         <p id="error-message">正在加载数据...</p>
     </div>
@@ -744,15 +738,6 @@ learningBtn.addEventListener('click', () => {
     // 筛选器组元素
     const teacherFilterGroup = document.getElementById('teacher-filter-group');
     const studentFilterGroup = document.getElementById('student-filter-group');
-    
-    // 添加视图模式选择监听
-    document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            currentViewMode = this.value;
-            updateFilterVisibility();
-            applyFilters();
-        });
-    });
     
     // 更新筛选器可见性
     function updateFilterVisibility() {
