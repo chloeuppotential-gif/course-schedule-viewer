@@ -844,22 +844,22 @@ function loadDataAndInitialize() {
                 return [];
             }
         })
-        .then(studentData => {
-            students = studentData || [];
-            console.log("已加载学生数据:", students);
-            ...
-            collapsedGroups.clear();
-            currentDisplayDate = new Date();
-            updateFilterVisibility();
-            applyFilters();
-            errorMessage.textContent = '';
-            console.log("✅ 数据加载完成，首次渲染已执行");
-        })   // ✅ 补上这个
-        .catch(err => {
-            errorMessage.textContent = '加载数据失败: ' + err.message;
-            console.error(err);
-            renderEmpty();
-        });
+      .then(studentData => {
+    students = studentData || [];
+    console.log("已加载学生数据:", students);
+    // ...
+    collapsedGroups.clear();
+    currentDisplayDate = new Date();
+    updateFilterVisibility();
+    applyFilters();
+    errorMessage.textContent = '';
+    console.log("✅ 数据加载完成，首次渲染已执行");
+}) // ✅ ← 这里闭合 .then(studentData => { ... })
+.catch(err => {
+    errorMessage.textContent = '加载数据失败: ' + err.message;
+    console.error(err);
+    renderEmpty();
+});
 }
 
     // 修改的populateFilterDropdown函数
