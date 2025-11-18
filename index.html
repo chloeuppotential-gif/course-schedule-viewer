@@ -1714,6 +1714,8 @@ const dateMatch =
         // [新增功能结束]
                       // === 信息老师 Progress Check 自动生成 ===
 if (currentViewMode !== 'student-only') {
+   console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
+console.log('📦 第一条示例:', tasksToRender[0]);
     const infoSingleCourses = tasksToRender.filter(t => 
         (t.teacher === '信息' || t.teacher.includes('信息')) &&
         t.courseStart === t.courseEnd
