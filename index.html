@@ -1712,26 +1712,6 @@ const dateMatch =
             });
         }
         // [新增功能结束]
-                      // === 信息老师 Progress Check 自动生成 ===
-if (currentViewMode !== 'student-only') {
-   console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
-console.log('📦 第一条示例:', tasksToRender[0]);
-       console.log('👀 所有教师字段预览:',
-    const infoSingleCourses = tasksToRender.filter(t => 
-        (t.teacher === '信息' || t.teacher.includes('信息')) &&
-        t.courseStart === t.courseEnd
-    );
-
-    infoSingleCourses.forEach(task => {
-        const nextDayDate = new Date(task.courseEnd + 'T00:00:00');
-        nextDayDate.setDate(nextDayDate.getDate() + 1);
-
-        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
-        const nextDayCell = calendarView.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
-
-        if (nextDayCell) {
-            console.log('✅ 信息老师 Progress Check 添加至:', nextDayStr);
-
             const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
             const progressCheckDiv = document.createElement('div');
             progressCheckDiv.className = 'calendar-marker marker-info-teacher';
@@ -1771,6 +1751,28 @@ console.log('📦 第一条示例:', tasksToRender[0]);
             console.log('⚠️ Progress Check 未显示, 因第二天不在当前月份范围:', nextDayStr);
         }
     });
+}
+       // === 信息老师 Progress Check 自动生成 ===
+if (currentViewMode !== 'student-only') {
+   console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
+console.log('📦 第一条示例:', tasksToRender[0]);
+       console.log('👀 所有教师字段预览:',
+    const infoSingleCourses = tasksToRender.filter(t => 
+        (t.teacher === '信息' || t.teacher.includes('信息')) &&
+        t.courseStart === t.courseEnd
+    );
+
+    infoSingleCourses.forEach(task => {
+        const nextDayDate = new Date(task.courseEnd + 'T00:00:00');
+        nextDayDate.setDate(nextDayDate.getDate() + 1);
+
+        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
+        const nextDayCell = calendarView.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+
+        if (nextDayCell) {
+            console.log('✅ 信息老师 Progress Check 添加至:', nextDayStr);
+             }
+  });
 }
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
