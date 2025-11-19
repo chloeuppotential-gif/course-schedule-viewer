@@ -1711,19 +1711,47 @@ const dateMatch =
                 }
             });
         }
-       // ==================== Progress Check 功能 ====================
+        // ==================== Progress Check 功能 ====================
+        console.log('🚀 开始执行 Progress Check 逻辑');
+        console.log('📊 当前视图模式:', currentViewMode);
+        console.log('📊 tasksToRender 数量:', tasksToRender.length);
+        console.log('📊 tasksToRender 内容:', tasksToRender);
+        
         if (currentViewMode !== 'student-only') {
             const processedProgressChecks = new Set();
             
-            tasksToRender.forEach(task => {
-                // 只处理信息老师的课程，且必须是"课时三-上"
-                const isInfoTeacher = task.teacher.includes('信息') || task.teacher === '信息';
-                const isSession3Up = task.session && task.session.includes('课时三') && task.session.includes('上');
+            tasksToRender.forEach((task, index) => {
+                console.log(`\n--- 检查任务 #${index} ---`);
+                console.log('老师:', task.teacher);
+                console.log('主题:', task.topic);
+                console.log('课时:', task.session);
+                console.log('结束日期:', task.sessionEnd);
                 
-                if (!isInfoTeacher || !isSession3Up) return;
+                // 只处理信息老师的课程
+                const isInfoTeacher = task.teacher && (task.teacher.includes('信息') || task.teacher === '信息');
+                console.log('✓ 是信息老师?', isInfoTeacher);
+                
+                if (!isInfoTeacher) {
+                    console.log('❌ 不是信息老师，跳过');
+                    return;
+                }
+                
+                // 检查是否是"课时三-上"
+                const isSession3Up = task.session && task.session.includes('课时三') && task.session.includes('上');
+                console.log('✓ 是课时三-上?', isSession3Up, '(session:', task.session, ')');
+                
+                if (!isSession3Up) {
+                    console.log('❌ 不是课时三-上，跳过');
+                    return;
+                }
                 
                 // 确保有结束日期
-                if (!task.sessionEnd) return;
+                if (!task.sessionEnd) {
+                    console.log('❌ 没有结束日期，跳过');
+                    return;
+                }
+                
+                console.log('✅ 通过所有条件检查！');
                 
                 // 计算第二天日期
                 const sessionEndDate = new Date(task.sessionEnd + 'T00:00:00');
@@ -1735,25 +1763,34 @@ const dateMatch =
                 const nextDayDate = nextDay.getDate();
                 const nextDayStr = `${nextDayYear}-${String(nextDayMonth + 1).padStart(2, '0')}-${String(nextDayDate).padStart(2, '0')}`;
                 
+                console.log('📅 课程结束日期:', task.sessionEnd);
+                console.log('📅 Progress Check 日期:', nextDayStr);
+                console.log('📅 当前显示月份:', year, month);
+                
                 // 检查第二天是否在当前显示月份
                 if (nextDayYear !== year || nextDayMonth !== month) {
-                    console.log('⚠️ Progress Check 不在当前月份:', nextDayStr);
+                    console.log('⚠️ Progress Check 不在当前月份，跳过');
                     return;
                 }
                 
                 // 防止重复添加
                 const checkKey = `${task.teacher}|${task.topic}|${task.session}|${nextDayStr}`;
-                if (processedProgressChecks.has(checkKey)) return;
+                if (processedProgressChecks.has(checkKey)) {
+                    console.log('⚠️ 已处理过此 Progress Check，跳过');
+                    return;
+                }
                 processedProgressChecks.add(checkKey);
                 
                 // 找到对应的日期单元格
                 const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+                console.log('🔍 查找日期单元格:', nextDayStr, nextDayCell ? '找到' : '未找到');
+                
                 if (!nextDayCell) {
-                    console.log('⚠️ 找不到日期单元格:', nextDayStr);
+                    console.log('❌ 找不到日期单元格，跳过');
                     return;
                 }
                 
-                // 创建 Progress Check 标记 - 使用紫色条纹样式
+                // 创建 Progress Check 标记
                 const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
                 const progressCheckDiv = document.createElement('div');
                 progressCheckDiv.className = 'calendar-marker marker-progress-check';
@@ -1805,11 +1842,14 @@ const dateMatch =
                 // 添加到日期单元格
                 nextDayCell.appendChild(progressCheckDiv);
                 
-                console.log('✅ Progress Check 已添加:', nextDayStr, task.teacher, task.topic, task.session);
+                console.log('✅✅✅ Progress Check 已成功添加到日历！');
             });
+            
+            console.log('🏁 Progress Check 逻辑执行完毕');
+        } else {
+            console.log('⚠️ 当前是学生视图，跳过 Progress Check');
         }
         // ==================== Progress Check 功能结束 ====================
-        
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
     }
