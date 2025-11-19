@@ -1711,47 +1711,7 @@ const dateMatch =
                 }
             });
         }
-        // [新增功能结束]
-            const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
-            const progressCheckDiv = document.createElement('div');
-            progressCheckDiv.className = 'calendar-marker marker-info-teacher';
-            progressCheckDiv.textContent = `${task.teacher} - ${task.topic}${task.session || ''} - Progress Check`;
-
-            // 多用户检查功能
-            const taskChecks = checkStatus[taskId] || {};
-            const checkContainer = document.createElement('div');
-            checkContainer.className = 'multi-checkbox';
-
-            users.forEach(user => {
-                const isChecked = !!taskChecks[user.id];
-                const checkboxContainer = document.createElement('div');
-                checkboxContainer.className = 'checkbox-container';
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'user-checkbox';
-                checkbox.dataset.userId = user.id;
-                checkbox.checked = isChecked;
-
-                const checkboxDisplay = document.createElement('div');
-                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                checkbox.addEventListener('change', function() {
-                    const checked = checkbox.checked;
-                    saveMultiUserCheckStatus(taskId, user.id, checked);
-                    if (checked) showFeedback(progressCheckDiv, user.id);
-                });
-
-                checkboxContainer.appendChild(checkbox);
-                checkboxContainer.appendChild(checkboxDisplay);
-                checkContainer.appendChild(checkboxContainer);
-            });
-
-            progressCheckDiv.prepend(checkContainer);
-            nextDayCell.appendChild(progressCheckDiv);
-        } else {
-            console.log('⚠️ Progress Check 未显示, 因第二天不在当前月份范围:', nextDayStr);
-        }
-    });
-}
+      
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
     }
