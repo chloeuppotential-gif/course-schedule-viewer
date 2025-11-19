@@ -1753,7 +1753,7 @@ const dateMatch =
     });
 }
 
-    // === 信息老师 Progress Check 自动生成 ===
+   // === 信息老师 Progress Check 自动生成 ===
         if (currentViewMode !== 'student-only') {
             console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
             console.log('👀 所有教师字段预览：', tasksToRender.map(t => t.teacher));
@@ -1801,7 +1801,9 @@ const dateMatch =
                         checkbox.addEventListener('change', function() {
                             const checked = checkbox.checked;
                             saveMultiUserCheckStatus(taskId, user.id, checked);
-                            if (checked) showFeedback(progressCheckDiv, user.id);
+                            if (checked) {
+                                showFeedback(progressCheckDiv, user.id);
+                            }
                         });
 
                         checkboxContainer.appendChild(checkbox);
@@ -1820,7 +1822,6 @@ const dateMatch =
                 }
             });
         }
-        
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
     }
