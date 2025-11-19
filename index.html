@@ -1756,7 +1756,7 @@ const dateMatch =
 if (currentViewMode !== 'student-only') {
    console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
 console.log('📦 第一条示例:', tasksToRender[0]);
-       console.log('👀 所有教师字段预览:',
+       console.log('👀 所有教师字段预览：', tasksToRender.map(t => t.teacher));
     const infoSingleCourses = tasksToRender.filter(t => 
         (t.teacher === '信息' || t.teacher.includes('信息')) &&
         t.courseStart === t.courseEnd
