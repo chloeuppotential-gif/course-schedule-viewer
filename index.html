@@ -546,43 +546,55 @@
         <style>
     /* ...你现有的所有样式... */
     
-    /* 👇 在这里添加 Progress Check 样式 👇 */
-    /* Progress Check 专用紫色条纹样式 - 增强优先级 */
-    .calendar-marker.marker-progress-check {
-        background: repeating-linear-gradient(
-            45deg,
-            #9b59b6,
-            #9b59b6 10px,
-            #8e44ad 10px,
-            #8e44ad 20px
-        ) !important;
-        color: white !important;
-        border-left: 4px solid #6c3483 !important;
-        font-weight: bold !important;
-    }
+   /* Progress Check 专用紫色条纹样式 - 超强优先级 */
+div.calendar-marker.marker-progress-check {
+    background: repeating-linear-gradient(
+        45deg,
+        #9b59b6,
+        #9b59b6 10px,
+        #8e44ad 10px,
+        #8e44ad 20px
+    ) !important;
+    color: white !important;
+    border-left: 4px solid #6c3483 !important;
+    font-weight: bold !important;
+    min-height: 50px !important;
+}
 
-    .calendar-marker.marker-progress-check:hover {
-        background: repeating-linear-gradient(
-            45deg,
-            #8e44ad,
-            #8e44ad 10px,
-            #7d3c98 10px,
-            #7d3c98 20px
-        ) !important;
-        opacity: 0.9;
-    }
+/* 确保悬浮时也保持紫色 */
+div.calendar-marker.marker-progress-check:hover {
+    background: repeating-linear-gradient(
+        45deg,
+        #8e44ad,
+        #8e44ad 10px,
+        #7d3c98 10px,
+        #7d3c98 20px
+    ) !important;
+    opacity: 0.95 !important;
+}
 
-    .calendar-marker.marker-progress-check .multi-checkbox {
-        background: transparent !important;
-    }
+/* Checkbox 容器透明 */
+div.calendar-marker.marker-progress-check .multi-checkbox {
+    background: transparent !important;
+    border: none !important;
+}
 
-    .calendar-marker.marker-progress-check .checkbox-display {
-        background: rgba(255, 255, 255, 0.3) !important;
-    }
+/* Checkbox 显示样式 */
+div.calendar-marker.marker-progress-check .checkbox-display {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border: 2px solid rgba(255, 255, 255, 0.5) !important;
+}
 
-    .calendar-marker.marker-progress-check input[type="checkbox"]:checked + .checkbox-display {
-        background: rgba(255, 255, 255, 0.9) !important;
-    }
+/* 已勾选的 Checkbox */
+div.calendar-marker.marker-progress-check input[type="checkbox"]:checked + .checkbox-display {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-color: white !important;
+}
+
+/* 确保文本可见 */
+div.calendar-marker.marker-progress-check {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+}
     </style>
 </head>
 <body>
