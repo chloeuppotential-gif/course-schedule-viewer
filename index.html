@@ -1711,6 +1711,102 @@ const dateMatch =
                 }
             });
         }
+        // ==================== Progress Check 功能 ====================
+        if (currentViewMode !== 'student-only') {
+            const processedProgressChecks = new Set();
+            
+            tasksToRender.forEach(task => {
+                // 只处理信息老师的课程
+                const isInfoTeacher = task.teacher.includes('信息') || task.teacher === '信息';
+                if (!isInfoTeacher) return;
+                
+                // 确保有结束日期
+                if (!task.sessionEnd) return;
+                
+                // 计算第二天日期
+                const sessionEndDate = new Date(task.sessionEnd + 'T00:00:00');
+                const nextDay = new Date(sessionEndDate);
+                nextDay.setDate(nextDay.getDate() + 1);
+                
+                const nextDayYear = nextDay.getFullYear();
+                const nextDayMonth = nextDay.getMonth();
+                const nextDayDate = nextDay.getDate();
+                const nextDayStr = `${nextDayYear}-${String(nextDayMonth + 1).padStart(2, '0')}-${String(nextDayDate).padStart(2, '0')}`;
+                
+                // 检查第二天是否在当前显示月份
+                if (nextDayYear !== year || nextDayMonth !== month) {
+                    console.log('⚠️ Progress Check 不在当前月份:', nextDayStr);
+                    return;
+                }
+                
+                // 防止重复添加
+                const checkKey = `${task.teacher}|${task.topic}|${task.session}|${nextDayStr}`;
+                if (processedProgressChecks.has(checkKey)) return;
+                processedProgressChecks.add(checkKey);
+                
+                // 找到对应的日期单元格
+                const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+                if (!nextDayCell) {
+                    console.log('⚠️ 找不到日期单元格:', nextDayStr);
+                    return;
+                }
+                
+                // 创建 Progress Check 标记
+                const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
+                const progressCheckDiv = document.createElement('div');
+                progressCheckDiv.className = 'calendar-marker marker-info-teacher';
+                progressCheckDiv.dataset.taskId = taskId;
+                
+                // 获取当前任务的检查状态
+                const taskChecks = checkStatus[taskId] || {};
+                
+                // 创建多用户检查框
+                const checkContainer = document.createElement('div');
+                checkContainer.className = 'multi-checkbox';
+                
+                users.forEach(user => {
+                    const isChecked = taskChecks[user.id] || false;
+                    
+                    const checkboxContainer = document.createElement('div');
+                    checkboxContainer.className = 'checkbox-container';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'user-checkbox';
+                    checkbox.dataset.userId = user.id;
+                    checkbox.checked = isChecked;
+                    
+                    const checkboxDisplay = document.createElement('div');
+                    checkboxDisplay.className = `checkbox-display ${user.id}`;
+                    
+                    checkbox.addEventListener('change', function() {
+                        const checked = checkbox.checked;
+                        saveMultiUserCheckStatus(taskId, user.id, checked);
+                        if (checked) {
+                            showFeedback(progressCheckDiv, user.id);
+                        }
+                    });
+                    
+                    checkboxContainer.appendChild(checkbox);
+                    checkboxContainer.appendChild(checkboxDisplay);
+                    checkContainer.appendChild(checkboxContainer);
+                });
+                
+                progressCheckDiv.appendChild(checkContainer);
+                
+                // 添加文本内容
+                const textNode = document.createTextNode(
+                    `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} - Progress Check`
+                );
+                progressCheckDiv.appendChild(textNode);
+                
+                // 添加到日期单元格
+                nextDayCell.appendChild(progressCheckDiv);
+                
+                console.log('✅ Progress Check 已添加:', nextDayStr, task.teacher, task.topic, task.session);
+            });
+        }
+        // ==================== Progress Check 功能结束 ====================
       
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
