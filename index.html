@@ -1752,75 +1752,75 @@ const dateMatch =
         }
     });
 }
-      // === 信息老师 Progress Check 自动生成 ===
-if (currentViewMode !== 'student-only') {
-    console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
-    console.log('👀 所有教师字段预览：', tasksToRender.map(t => t.teacher));
-    
-    const infoSingleCourses = tasksToRender.filter(t => 
-        (t.teacher === '信息' || t.teacher.includes('信息')) &&
-        t.courseStart === t.courseEnd
-    );
 
-    console.log(`🎯 找到 ${infoSingleCourses.length} 个信息老师单天课程`);
-
-    infoSingleCourses.forEach(task => {
-        const nextDayDate = new Date(task.courseEnd + 'T00:00:00');
-        nextDayDate.setDate(nextDayDate.getDate() + 1);
-
-        const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
-        const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
-
-        if (nextDayCell) {
-            console.log('✅ 信息老师 Progress Check 添加至:', nextDayStr);
+    // === 信息老师 Progress Check 自动生成 ===
+        if (currentViewMode !== 'student-only') {
+            console.log('📦 当前 tasksToRender 共多少项:', tasksToRender.length);
+            console.log('👀 所有教师字段预览：', tasksToRender.map(t => t.teacher));
             
-            // ✅ 添加实际的DOM元素
-            const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
-            const progressCheckDiv = document.createElement('div');
-            progressCheckDiv.className = 'calendar-marker marker-info-teacher';
-            progressCheckDiv.dataset.taskId = taskId;
-            
-            // 多用户检查功能
-            const taskChecks = checkStatus[taskId] || {};
-            const checkContainer = document.createElement('div');
-            checkContainer.className = 'multi-checkbox';
+            const infoSingleCourses = tasksToRender.filter(t => 
+                (t.teacher === '信息' || t.teacher.includes('信息')) &&
+                t.courseStart === t.courseEnd
+            );
 
-            users.forEach(user => {
-                const isChecked = !!taskChecks[user.id];
-                const checkboxContainer = document.createElement('div');
-                checkboxContainer.className = 'checkbox-container';
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'user-checkbox';
-                checkbox.dataset.userId = user.id;
-                checkbox.checked = isChecked;
+            console.log(`🎯 找到 ${infoSingleCourses.length} 个信息老师单天课程`);
 
-                const checkboxDisplay = document.createElement('div');
-                checkboxDisplay.className = `checkbox-display ${user.id}`;
-                
-                checkbox.addEventListener('change', function() {
-                    const checked = checkbox.checked;
-                    saveMultiUserCheckStatus(taskId, user.id, checked);
-                    if (checked) showFeedback(progressCheckDiv, user.id);
-                });
+            infoSingleCourses.forEach(task => {
+                const nextDayDate = new Date(task.courseEnd + 'T00:00:00');
+                nextDayDate.setDate(nextDayDate.getDate() + 1);
 
-                checkboxContainer.appendChild(checkbox);
-                checkboxContainer.appendChild(checkboxDisplay);
-                checkContainer.appendChild(checkboxContainer);
+                const nextDayStr = `${nextDayDate.getFullYear()}-${String(nextDayDate.getMonth() + 1).padStart(2, '0')}-${String(nextDayDate.getDate()).padStart(2, '0')}`;
+                const nextDayCell = grid.querySelector(`.calendar-day[data-date="${nextDayStr}"]`);
+
+                if (nextDayCell) {
+                    console.log('✅ 信息老师 Progress Check 添加至:', nextDayStr);
+                    
+                    const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
+                    const progressCheckDiv = document.createElement('div');
+                    progressCheckDiv.className = 'calendar-marker marker-info-teacher';
+                    progressCheckDiv.dataset.taskId = taskId;
+                    
+                    const taskChecks = checkStatus[taskId] || {};
+                    const checkContainer = document.createElement('div');
+                    checkContainer.className = 'multi-checkbox';
+
+                    users.forEach(user => {
+                        const isChecked = !!taskChecks[user.id];
+                        const checkboxContainer = document.createElement('div');
+                        checkboxContainer.className = 'checkbox-container';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'user-checkbox';
+                        checkbox.dataset.userId = user.id;
+                        checkbox.checked = isChecked;
+
+                        const checkboxDisplay = document.createElement('div');
+                        checkboxDisplay.className = `checkbox-display ${user.id}`;
+                        
+                        checkbox.addEventListener('change', function() {
+                            const checked = checkbox.checked;
+                            saveMultiUserCheckStatus(taskId, user.id, checked);
+                            if (checked) showFeedback(progressCheckDiv, user.id);
+                        });
+
+                        checkboxContainer.appendChild(checkbox);
+                        checkboxContainer.appendChild(checkboxDisplay);
+                        checkContainer.appendChild(checkboxContainer);
+                    });
+
+                    progressCheckDiv.prepend(checkContainer);
+                    progressCheckDiv.appendChild(document.createTextNode(
+                        ` ${task.teacher} - ${task.topic}${task.session || ''} - Progress Check`
+                    ));
+                    
+                    nextDayCell.appendChild(progressCheckDiv);
+                } else {
+                    console.log('⚠️ Progress Check 未显示，第二天不在当前月份:', nextDayStr);
+                }
             });
-
-            progressCheckDiv.prepend(checkContainer);
-            progressCheckDiv.appendChild(document.createTextNode(
-                ` ${task.teacher} - ${task.topic}${task.session || ''} - Progress Check`
-            ));
-            
-            nextDayCell.appendChild(progressCheckDiv);
-        } else {
-            console.log('⚠️ Progress Check 未显示，第二天不在当前月份:', nextDayStr);
         }
-    });
-}
+        
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
     }
