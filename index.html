@@ -1725,7 +1725,7 @@ const dateMatch =
                 console.log('老师:', task.teacher);
                 console.log('主题:', task.topic);
                 console.log('课时:', task.session);
-                console.log('结束日期:', task.sessionEnd);
+                console.log('开始日期:', task.sessionStart);
                 
                 // 只处理信息老师的课程
                 const isInfoTeacher = task.teacher && (task.teacher.includes('信息') || task.teacher === '信息');
@@ -1736,26 +1736,26 @@ const dateMatch =
                     return;
                 }
                 
-                // 检查是否是"课时三-上"
-                const isSession3Up = task.session && task.session.includes('课时三') && task.session.includes('上');
-                console.log('✓ 是课时三-上?', isSession3Up, '(session:', task.session, ')');
+                // 检查是否是"课时三"
+                const isSession3 = task.session && task.session.includes('课时三');
+                console.log('✓ 是课时三?', isSession3, '(session:', task.session, ')');
                 
-                if (!isSession3Up) {
-                    console.log('❌ 不是课时三-上，跳过');
+                if (!isSession3) {
+                    console.log('❌ 不是课时三，跳过');
                     return;
                 }
                 
-                // 确保有结束日期
-                if (!task.sessionEnd) {
-                    console.log('❌ 没有结束日期，跳过');
+                // 确保有开始日期
+                if (!task.sessionStart) {
+                    console.log('❌ 没有开始日期，跳过');
                     return;
                 }
                 
                 console.log('✅ 通过所有条件检查！');
                 
-                // 计算第二天日期
-                const sessionEndDate = new Date(task.sessionEnd + 'T00:00:00');
-                const nextDay = new Date(sessionEndDate);
+                // 计算起始日期的第二天
+                const sessionStartDate = new Date(task.sessionStart + 'T00:00:00');
+                const nextDay = new Date(sessionStartDate);
                 nextDay.setDate(nextDay.getDate() + 1);
                 
                 const nextDayYear = nextDay.getFullYear();
@@ -1763,7 +1763,7 @@ const dateMatch =
                 const nextDayDate = nextDay.getDate();
                 const nextDayStr = `${nextDayYear}-${String(nextDayMonth + 1).padStart(2, '0')}-${String(nextDayDate).padStart(2, '0')}`;
                 
-                console.log('📅 课程结束日期:', task.sessionEnd);
+                console.log('📅 课程开始日期:', task.sessionStart);
                 console.log('📅 Progress Check 日期:', nextDayStr);
                 console.log('📅 当前显示月份:', year, month);
                 
@@ -1790,7 +1790,7 @@ const dateMatch =
                     return;
                 }
                 
-                // 创建 Progress Check 标记
+                // 创建 Progress Check 标记 - 使用紫色条纹样式
                 const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
                 const progressCheckDiv = document.createElement('div');
                 progressCheckDiv.className = 'calendar-marker marker-progress-check';
