@@ -1711,14 +1711,16 @@ const dateMatch =
                 }
             });
         }
-        // ==================== Progress Check 功能 ====================
+       // ==================== Progress Check 功能 ====================
         if (currentViewMode !== 'student-only') {
             const processedProgressChecks = new Set();
             
             tasksToRender.forEach(task => {
-                // 只处理信息老师的课程
+                // 只处理信息老师的课程，且必须是"课时三-上"
                 const isInfoTeacher = task.teacher.includes('信息') || task.teacher === '信息';
-                if (!isInfoTeacher) return;
+                const isSession3Up = task.session && task.session.includes('课时三') && task.session.includes('上');
+                
+                if (!isInfoTeacher || !isSession3Up) return;
                 
                 // 确保有结束日期
                 if (!task.sessionEnd) return;
@@ -1751,10 +1753,10 @@ const dateMatch =
                     return;
                 }
                 
-                // 创建 Progress Check 标记
+                // 创建 Progress Check 标记 - 使用紫色条纹样式
                 const taskId = `task-${task.teacher}-${task.topic}-${task.session}-progress-${nextDayStr}`;
                 const progressCheckDiv = document.createElement('div');
-                progressCheckDiv.className = 'calendar-marker marker-info-teacher';
+                progressCheckDiv.className = 'calendar-marker marker-progress-check';
                 progressCheckDiv.dataset.taskId = taskId;
                 
                 // 获取当前任务的检查状态
@@ -1796,7 +1798,7 @@ const dateMatch =
                 
                 // 添加文本内容
                 const textNode = document.createTextNode(
-                    `${task.teacher} - ${task.topic}${task.session ? '-' + task.session : ''} - Progress Check`
+                    `${task.teacher} - ${task.topic} - Progress Check`
                 );
                 progressCheckDiv.appendChild(textNode);
                 
@@ -1807,7 +1809,7 @@ const dateMatch =
             });
         }
         // ==================== Progress Check 功能结束 ====================
-      
+        
         gridContainer.append(weekdays, grid);
         calendarView.append(header, gridContainer);
     }
