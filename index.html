@@ -1715,7 +1715,6 @@ const dateMatch =
         console.log('🚀 开始执行 Progress Check 逻辑');
         console.log('📊 当前视图模式:', currentViewMode);
         console.log('📊 tasksToRender 数量:', tasksToRender.length);
-        console.log('📊 tasksToRender 内容:', tasksToRender);
         
         if (currentViewMode !== 'student-only') {
             const processedProgressChecks = new Set();
@@ -1736,12 +1735,12 @@ const dateMatch =
                     return;
                 }
                 
-                // 检查是否是"课时三"
-                const isSession3 = task.session && task.session.includes('课时三');
-                console.log('✓ 是课时三?', isSession3, '(session:', task.session, ')');
+                // 检查是否有课时信息
+                const hasSession = task.session && task.session.trim() !== '';
+                console.log('✓ 有课时信息?', hasSession, '(session:', task.session, ')');
                 
-                if (!isSession3) {
-                    console.log('❌ 不是课时三，跳过');
+                if (!hasSession) {
+                    console.log('❌ 没有课时信息，跳过');
                     return;
                 }
                 
