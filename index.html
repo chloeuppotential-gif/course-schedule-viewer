@@ -1847,6 +1847,14 @@ const dateMatch =
                 progressCheckDiv.className = 'calendar-marker marker-progress-check';
                 progressCheckDiv.dataset.taskId = taskId;
                 
+                // 🎨 强制设置紫色条纹背景
+                progressCheckDiv.style.background = 'repeating-linear-gradient(45deg, #9b59b6, #9b59b6 10px, #8e44ad 10px, #8e44ad 20px)';
+                progressCheckDiv.style.color = 'white';
+                progressCheckDiv.style.borderLeft = '4px solid #6c3483';
+                progressCheckDiv.style.fontWeight = 'bold';
+                progressCheckDiv.style.textShadow = '0 1px 3px rgba(0,0,0,0.3)';
+                progressCheckDiv.style.minHeight = '50px';
+                
                 // 获取当前任务的检查状态
                 const taskChecks = checkStatus[taskId] || {};
                 
